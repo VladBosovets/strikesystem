@@ -8,27 +8,62 @@
   "menu": {
     "items": [
       {
-        "label": "Mop comments",
-        "description": "Remove this comment and all child comments. This might take a few seconds to run.",
+        "label": "Issue Warning",
+        "description": "Issue a strike warning to the author of this comment.",
         "location": "comment",
         "forUserType": "moderator",
-        "endpoint": "/internal/menu/mop-comment"
+        "endpoint": "/internal/menu/warn-user"
       },
       {
-        "label": "Mop post comments",
-        "description": "Remove all comments of this post. This might take a few seconds to run.",
+        "label": "Issue Warning",
+        "description": "Issue a strike warning to the author of this post.",
         "location": "post",
         "forUserType": "moderator",
-        "endpoint": "/internal/menu/mop-post"
+        "endpoint": "/internal/menu/warn-user"
       }
     ]
   },
   "forms": {
-    "mopComment": "/internal/form/mop-comment-submit",
-    "mopPost": "/internal/form/mop-post-submit"
+    "warnUser": "/internal/form/warn-user-submit"
   },
   "triggers": {
-    "onAppInstall": "/internal/triggers/on-app-install"
+    "onAppInstall": "/internal/triggers/on-app-install",
+    "onPostDelete": "/internal/triggers/on-post-delete",
+    "onCommentDelete": "/internal/triggers/on-comment-delete"
+  },
+  "settings": {
+    "global": {
+      "maxStrikes": {
+        "label": "Max warnings before ban",
+        "type": "number",
+        "defaultValue": 3,
+        "helpText": "Number of warnings before auto-ban triggers. Default: 3."
+      },
+      "banDuration": {
+        "label": "Ban duration (days)",
+        "type": "number",
+        "defaultValue": 0,
+        "helpText": "How many days to ban the user. 0 = permanent ban."
+      },
+      "rules": {
+        "label": "Subreddit rules (one per line)",
+        "type": "paragraph",
+        "defaultValue": "Rule 1\nRule 2\nRule 3",
+        "helpText": "These appear as selectable options when issuing a warning."
+      },
+      "warningMessage": {
+        "label": "Custom warning message template",
+        "type": "paragraph",
+        "defaultValue": "",
+        "helpText": "Leave blank to use the default message. Available placeholders: {username}, {subreddit}, {ruleName}, {strikeNumber}, {maxStrikes}."
+      },
+      "notifyModmail": {
+        "label": "Notify mod team via modmail on auto-ban",
+        "type": "boolean",
+        "defaultValue": true,
+        "helpText": "Send a modmail to the subreddit when a user is auto-banned."
+      }
+    }
   },
   "scripts": {
     "build": "vite build",
