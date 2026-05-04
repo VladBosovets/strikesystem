@@ -34,10 +34,21 @@ export const DEFAULT_CONFIG: Config = {
   banDuration: 0,
 };
 
+export type PendingWarn = {
+  userId: string;
+  username: string;
+  postUrl: string;
+};
+
+const PENDING_WARN_TTL_SECONDS = 900; // 15 minutes
+
 const strikeKey = (subredditId: string, userId: string) =>
   `strikes:${subredditId}:${userId}`;
 
 const configKey = (subredditId: string) => `config:${subredditId}`;
+
+const pendingWarnKey = (subredditId: string, modUserId: string) =>
+  `warn-pending:${subredditId}:${modUserId}`;
 
 export async function getStrikeRecord(
   subredditId: string,
@@ -72,4 +83,25 @@ export async function deleteUserData(
   userId: string
 ): Promise<void> {
   await redis.del(strikeKey(subredditId, userId));
+}
+
+export async function savePendingWarn(
+  subredditId: string,
+  modUserId: string,
+  data: PendingWarn
+): Promise<void> {
+  const key = pendingWarnKey(subredditId, modUserId);
+  await redis.set(key, JSON.stringify(data));
+  await redis.expire(key, PENDING_WARN_TTL_SECONDS);
+}
+
+export async function popPendingWarn(
+  subredditId: string,
+  modUserId: string
+): Promise<PendingWarn | null> {
+  const key = pendingWarnKey(subredditId, modUserId);
+  const raw = await redis.get(key);
+  if (!raw) return null;
+  await redis.del(key);
+  return JSON.parse(raw) as PendingWarn;
 }

@@ -2,11 +2,9 @@ import { Hono } from 'hono';
 import type { UiResponse } from '@devvit/web/shared';
 import { reddit, context } from '@devvit/web/server';
 import { addStrike, checkAndBan, buildWarningDM } from '../core/strikes';
+import { popPendingWarn } from '../core/redis';
 
 type WarnUserFormValues = {
-  userId?: string;
-  username?: string;
-  postUrl?: string;
   history?: string;
   rule?: string | string[];
   note?: string;
@@ -18,18 +16,22 @@ forms.post('/warn-user-submit', async (c) => {
   try {
     const values = await c.req.json<WarnUserFormValues>();
 
-    const userId = values.userId?.trim();
-    const username = values.username?.trim();
-    const postUrl = values.postUrl?.trim() ?? '';
+    const modUserId = context.userId;
+    if (!modUserId) {
+      return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
+    }
+    const pending = await popPendingWarn(context.subredditId, modUserId);
+    if (!pending) {
+      return c.json<UiResponse>({ showToast: 'Session expired. Please try again.' }, 200);
+    }
+
+    const { userId, username, postUrl } = pending;
     const note = values.note?.trim() ?? '';
     const ruleRaw = values.rule;
     const ruleViolated = Array.isArray(ruleRaw)
       ? (ruleRaw[0] ?? '').trim()
       : (ruleRaw ?? '').trim();
 
-    if (!userId || !username) {
-      return c.json<UiResponse>({ showToast: 'Missing user info. Try again.' }, 200);
-    }
     if (!ruleViolated) {
       return c.json<UiResponse>({ showToast: 'Please select a rule.' }, 200);
     }

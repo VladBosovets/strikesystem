@@ -3,7 +3,7 @@ import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 import type { FormField } from '@devvit/shared-types/shared/form.js';
 import { reddit, context, settings } from '@devvit/web/server';
 import { getStrikes } from '../core/strikes';
-import { DEFAULT_CONFIG } from '../core/redis';
+import { DEFAULT_CONFIG, savePendingWarn } from '../core/redis';
 
 export const menu = new Hono();
 
@@ -82,28 +82,18 @@ menu.post('/warn-user', async (c) => {
       );
     }
 
+    const modUserId = context.userId;
+    if (!modUserId) {
+      return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
+    }
+
+    await savePendingWarn(context.subredditId, modUserId, {
+      userId: targetUser.id,
+      username: targetUser.username,
+      postUrl,
+    });
+
     const fields: FormField[] = [
-      {
-        name: 'userId',
-        label: 'User ID',
-        type: 'string',
-        required: true,
-        defaultValue: targetUser.id,
-      },
-      {
-        name: 'username',
-        label: 'Username',
-        type: 'string',
-        required: true,
-        defaultValue: targetUser.username,
-      },
-      {
-        name: 'postUrl',
-        label: 'Content URL',
-        type: 'string',
-        required: true,
-        defaultValue: postUrl,
-      },
       {
         name: 'history',
         label: 'Warning history',
