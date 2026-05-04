@@ -1,94 +1,116 @@
-# Devvit Mod Tool Template
+# Strike System
 
-A template for building Reddit moderation tools using Devvit web. This template provides a complete foundation for creating custom moderation tools with bulk comment management capabilities.
+A progressive warning and ban tracker for Reddit moderators. Issue structured warnings to rule-breaking users directly from the post or comment menu, automatically notify them with a clear explanation, track their full history, and auto-ban when they reach the configured strike limit.
 
-## Features
+---
 
-This template includes a working mod tool called **"Mop"** that demonstrates:
+## What it does
 
-- **Bulk Comment Management**: Remove or lock multiple comments at once
-- **Thread-level Actions**: "Mop comments" - Remove/lock a comment and all its replies
-- **Post-level Actions**: "Mop post comments" - Remove/lock all comments on a post
-- **Flexible Options**:
-  - Remove comments, lock comments, or both
-  - Skip distinguished comments (moderator/admin posts)
-- **Permission Checks**: Only moderators with proper permissions can use the tool
-- **User-friendly Forms**: Interactive forms with clear options and validation
+- **One-click warnings** — right-click any post or comment and select "Issue Warning"
+- **Strike history** — the warning form shows the user's full warning history before you act
+- **Automatic DMs** — warned users receive a clear message explaining which rule they broke, which warning number it is, and what happens next
+- **Auto-ban** — when a user reaches the configured strike limit, they are automatically banned and the mod team is notified via modmail
+- **Shared history** — all mods see the same strike record, so no institutional knowledge is lost between moderators
+- **Zero required setup** — works out of the box with sensible defaults; configure rules and limits at your own pace
 
-## Tech Stack
+---
 
-- [Devvit](https://developers.reddit.com/): Reddit's platform for building and deploying apps
-- [Vite](https://vite.dev/): Fast build tool for the web components
-- [Hono](https://hono.dev/): Lightweight web framework for backend logic
-- [TypeScript](https://www.typescriptlang.org/): Type-safe development
+## Installation
 
-## Getting Started
+1. Go to [developers.reddit.com/apps/strikesystem](https://developers.reddit.com/apps/strikesystem)
+2. Click **Add to Community** and select your subreddit
+3. Accept the permissions request
+4. The "Issue Warning" option will immediately appear in the mod menu on posts and comments
 
-1. **Clone this template** or use it as a starting point for your mod tool
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-3. **Configure your app** in `devvit.json`:
-   - Update the app name
-   - Set your development subreddit
-4. **Start developing**:
-   ```bash
-   npm run dev
-   ```
-5. **Test your changes** in your development subreddit
+---
 
-## Project Structure
+## Configuration
+
+After installing, go to your subreddit's **Mod Tools → Apps → Strike System** to configure:
+
+| Setting | Default | Description |
+|---|---|---|
+| Max warnings before ban | 3 | Number of warnings before auto-ban triggers |
+| Ban duration (days) | 0 | How long the ban lasts. 0 = permanent |
+| Subreddit rules | Rule 1 / Rule 2 / Rule 3 | One rule per line — these appear as options in the warning form |
+| Custom warning message | (default template) | The DM sent to warned users. Leave blank to use the built-in message |
+| Notify mod team on auto-ban | On | Sends a modmail when a user is auto-banned |
+
+### Setting up your rules
+
+In the **Subreddit rules** field, enter one rule per line. Example:
 
 ```
-src/
-├── index.ts          # Main server setup with Hono routes
-├── core/
-│   └── nuke.ts       # Core moderation logic for bulk operations
-└── routes/
-    ├── api.ts        # Public API endpoints
-    ├── forms.ts      # Form submission handlers
-    ├── menu.ts       # Context menu item handlers
-    └── triggers.ts   # App lifecycle triggers
+Rule 1 - No spam or self-promotion
+Rule 2 - Be respectful to other users
+Rule 3 - No misinformation
+Rule 4 - Posts must be on-topic
 ```
 
-## Customizing Your Mod Tool
+These will appear as a dropdown in the warning form so mods always pick from a consistent list.
 
-This template is designed to be easily customizable:
+### Custom warning message
 
-1. **Modify existing actions**: Edit the nuke functionality in `src/core/nuke.ts`
-2. **Add new menu items**: Update `devvit.json` and add handlers in `src/routes/menu.ts`
-3. **Create new forms**: Add form definitions and handlers in `src/routes/forms.ts`
-4. **Add API endpoints**: Extend `src/routes/api.ts` for external integrations
+You can write a custom DM template using these placeholders:
 
-## Commands
+| Placeholder | Replaced with |
+|---|---|
+| `{username}` | The warned user's Reddit username |
+| `{subreddit}` | Your subreddit name |
+| `{ruleName}` | The rule selected by the mod |
+| `{strikeNumber}` | Which warning number this is |
+| `{maxStrikes}` | The total warnings before auto-ban |
 
-- `npm run dev`: Starts development mode with live reload on your test subreddit
-- `npm run build`: Builds your mod tool for production
-- `npm run deploy`: Uploads a new version of your app to Reddit
-- `npm run launch`: Publishes your app for review and public use
-- `npm run login`: Authenticates your CLI with Reddit
-- `npm run type-check`: Runs TypeScript type checking, linting, and formatting
+Leave blank to use the built-in message.
 
-## How It Works
+---
 
-The template demonstrates Reddit mod tool development through the "Mop" feature:
+## How to issue a warning
 
-1. **Context Menu Integration**: Click on the Mod Shield icon in a comment to see custom mod actions
-2. **Permission Validation**: Automatically checks if the user has moderation permissions
-3. **Interactive Forms**: Presents options through Reddit's native form system
-4. **Reddit API**: Processes multiple comments using Reddit's API
+1. Find the post or comment that broke a rule
+2. Click the **three-dot menu** on the post or comment
+3. Select **"Issue Warning"**
+4. The form opens showing the user's warning history and current strike count
+5. Select the rule that was violated from the dropdown
+6. Add an optional note (only visible to mods, not sent to the user)
+7. Click **Issue Warning**
 
-## Development Notes
+The warned user receives a DM immediately. If this is their final warning, the form title will show a clear alert before you confirm.
 
-- **Permissions**: The app requires `reddit: true` permission to access Reddit's API
-- **User Types**: Menu items are restricted to `moderator` user type
+---
 
-## Deployment
+## Auto-ban
 
-1. Test thoroughly in your development subreddit
-2. Run `npm run deploy` to upload your app
-3. Use `npm run launch` to submit for Reddit's app review process
-4. Once approved, users can install your mod tool from Reddit's app directory
+When a user receives their final warning (default: 3rd warning), the app automatically:
 
-This template provides everything you need to build powerful, user-friendly moderation tools for Reddit communities.
+1. Bans the user from the subreddit
+2. Populates the ban reason with a summary of all their warnings
+3. Sends the mod team a modmail notification with the full history
+
+Mods are not required to take any extra action — the entire flow completes on form submit.
+
+---
+
+## Frequently asked questions
+
+**Will the app work if I have multiple moderators?**
+Yes — all mods share the same strike history. Any mod can issue warnings and any mod will see the full history when opening the warning form.
+
+**What if a user was warned in error?**
+Strike records are stored per user. Contact the mod team about record adjustments — a reset feature is on the roadmap.
+
+**What happens to data if the app is uninstalled?**
+All strike history and configuration data is stored within Reddit's infrastructure and will be removed if the app is uninstalled.
+
+---
+
+## Tech stack
+
+- [Devvit](https://developers.reddit.com/) — Reddit's developer platform
+- [Hono](https://hono.dev/) — lightweight web framework for backend logic
+- [TypeScript](https://www.typescriptlang.org/) — type-safe development
+- Redis (built-in via Devvit) — strike and config storage
+
+## Privacy
+
+Strike System makes no external API calls. All data is stored within Reddit's platform using Devvit's built-in Redis storage, scoped per subreddit. No user data is sent to third-party services.
