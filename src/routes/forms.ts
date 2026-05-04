@@ -1,114 +1,90 @@
 import { Hono } from 'hono';
 import type { UiResponse } from '@devvit/web/shared';
-import { context } from '@devvit/web/server';
-import { isT1, isT3 } from '@devvit/shared-types/tid.js';
-import { handleNuke, handleNukePost } from '../core/nuke';
+import { reddit, context } from '@devvit/web/server';
+import { addStrike, checkAndBan, buildWarningDM } from '../core/strikes';
 
-type NukeFormValues = {
-  remove?: boolean;
-  lock?: boolean;
-  skipDistinguished?: boolean;
-  targetId?: string;
+type WarnUserFormValues = {
+  userId?: string;
+  username?: string;
+  postUrl?: string;
+  history?: string;
+  rule?: string | string[];
+  note?: string;
 };
 
 export const forms = new Hono();
 
-const normalizeValues = (values: NukeFormValues) => ({
-  remove: Boolean(values.remove),
-  lock: Boolean(values.lock),
-  skipDistinguished: Boolean(values.skipDistinguished),
-});
+forms.post('/warn-user-submit', async (c) => {
+  try {
+    const values = await c.req.json<WarnUserFormValues>();
 
-const getTargetId = (values: NukeFormValues) => {
-  if (typeof values.targetId === 'string' && values.targetId.trim()) {
-    return values.targetId.trim();
-  }
+    const userId = values.userId?.trim();
+    const username = values.username?.trim();
+    const postUrl = values.postUrl?.trim() ?? '';
+    const note = values.note?.trim() ?? '';
+    const ruleRaw = values.rule;
+    const ruleViolated = Array.isArray(ruleRaw)
+      ? (ruleRaw[0] ?? '').trim()
+      : (ruleRaw ?? '').trim();
 
-  return context.postId;
-};
+    if (!userId || !username) {
+      return c.json<UiResponse>({ showToast: 'Missing user info. Try again.' }, 200);
+    }
+    if (!ruleViolated) {
+      return c.json<UiResponse>({ showToast: 'Please select a rule.' }, 200);
+    }
 
-forms.post('/mop-comment-submit', async (c) => {
-  const values = await c.req.json<NukeFormValues>();
-  console.log('values', values);
-  const normalized = normalizeValues(values);
+    const issuedBy = context.username ?? 'moderator';
+    const subredditId = context.subredditId;
+    const subredditName = context.subredditName;
 
-  if (!normalized.lock && !normalized.remove) {
+    const { newTotal, config } = await addStrike(subredditId, userId, {
+      username,
+      ruleViolated,
+      note,
+      issuedBy,
+      postUrl,
+    });
+
+    const dmText = buildWarningDM(
+      username,
+      subredditName,
+      newTotal,
+      config.maxStrikesBeforeBan,
+      ruleViolated,
+      note,
+      config.warningMessageTemplate
+    );
+
+    try {
+      await reddit.sendPrivateMessage({
+        to: username,
+        subject: `Warning from r/${subredditName}`,
+        text: dmText,
+      });
+    } catch (dmErr) {
+      console.error('Failed to send warning DM:', dmErr);
+    }
+
+    const wasBanned = await checkAndBan(subredditId, userId, subredditName);
+
+    if (wasBanned) {
+      return c.json<UiResponse>(
+        {
+          showToast: `u/${username} has been warned and auto-banned after reaching ${newTotal}/${config.maxStrikesBeforeBan} warnings.`,
+        },
+        200
+      );
+    }
+
     return c.json<UiResponse>(
       {
-        showToast: 'You must select either lock or remove.',
+        showToast: `Warning ${newTotal}/${config.maxStrikesBeforeBan} issued to u/${username}.`,
       },
       200
     );
+  } catch (err) {
+    console.error('warn-user-submit error:', err);
+    return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
   }
-
-  const targetId = getTargetId(values);
-  if (!isT1(targetId)) {
-    console.error('targetId is not a T1', targetId);
-    return c.json<UiResponse>(
-      {
-        showToast: 'Mop failed! Please try again later.',
-      },
-      200
-    );
-  }
-
-  const result = await handleNuke({
-    ...normalized,
-    commentId: targetId,
-    subredditId: context.subredditId,
-  });
-
-  console.log(
-    `Mop result - ${result.success ? 'success' : 'fail'} - ${result.message}`
-  );
-
-  return c.json<UiResponse>(
-    {
-      showToast: `${result.success ? 'Success' : 'Failed'} : ${result.message}`,
-    },
-    200
-  );
-});
-
-forms.post('/mop-post-submit', async (c) => {
-  const values = await c.req.json<NukeFormValues>();
-  console.log('values', values);
-  const normalized = normalizeValues(values);
-
-  if (!normalized.lock && !normalized.remove) {
-    return c.json<UiResponse>(
-      {
-        showToast: 'You must select either lock or remove.',
-      },
-      200
-    );
-  }
-
-  const targetId = getTargetId(values);
-  if (!isT3(targetId)) {
-    console.error('targetId is not a T3', targetId);
-    return c.json<UiResponse>(
-      {
-        showToast: 'Mop failed! Please try again later.',
-      },
-      200
-    );
-  }
-
-  const result = await handleNukePost({
-    ...normalized,
-    postId: targetId,
-    subredditId: context.subredditId,
-  });
-
-  console.log(
-    `Mop result - ${result.success ? 'success' : 'fail'} - ${result.message}`
-  );
-
-  return c.json<UiResponse>(
-    {
-      showToast: `${result.success ? 'Success' : 'Failed'} : ${result.message}`,
-    },
-    200
-  );
 });
