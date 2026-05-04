@@ -164,6 +164,7 @@ export function buildWarningDM(
 A moderator of r/${subredditName} has issued you a warning.
 
 Rule violated: ${ruleName}
+
 This is warning ${strikeNumber} of ${maxStrikes}.
 ${noteSection}${escalationWarning}${banNotice}
 If you believe this was issued in error, please contact the mod team:
