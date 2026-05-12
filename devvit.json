@@ -5,6 +5,16 @@
     "dir": "dist/server",
     "entry": "index.cjs"
   },
+  "post": {
+    "dir": "dist/client",
+    "entrypoints": {
+      "default": {
+        "entry": "index.html",
+        "height": "tall",
+        "inline": false
+      }
+    }
+  },
   "menu": {
     "items": [
       {
