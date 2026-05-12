@@ -534,6 +534,32 @@ menu.post('/remove-and-log', async (c) => {
   }
 });
 
+menu.post('/create-dashboard-post', async (c) => {
+  try {
+    const user = await reddit.getCurrentUser();
+    if (!user) {
+      return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
+    }
+
+    const modPermissions = await user.getModPermissionsForSubreddit(context.subredditName);
+    const canMod = modPermissions.includes('all') || modPermissions.includes('posts');
+    if (!canMod) {
+      return c.json<UiResponse>({ showToast: 'You do not have mod permissions.' }, 200);
+    }
+
+    const post = await reddit.submitCustomPost({
+      subredditName: context.subredditName,
+      title: 'Mod Dashboard — Strike System',
+      entry: 'default',
+    });
+
+    return c.json<UiResponse>({ navigateTo: post.url }, 200);
+  } catch (err) {
+    console.error('create-dashboard-post menu error:', err);
+    return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
+  }
+});
+
 menu.post('/view-all-warnings', async (c) => {
   try {
     const user = await reddit.getCurrentUser();

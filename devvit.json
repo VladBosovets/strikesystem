@@ -93,6 +93,13 @@
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/view-all-warnings"
+      },
+      {
+        "label": "Open Mod Dashboard",
+        "description": "Open the Strike System mod dashboard for this subreddit.",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/create-dashboard-post"
       }
     ]
   },

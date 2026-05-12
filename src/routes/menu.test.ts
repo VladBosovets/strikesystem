@@ -2,14 +2,35 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── mocks ────────────────────────────────────────────────────────────────────
 
-const { store, mockUser, mockContext, mockZRange } = vi.hoisted(() => {
+const { store, mockUser, mockReddit, mockContext, mockZRange } = vi.hoisted(() => {
   const mockUser = {
     getModPermissionsForSubreddit: vi.fn(async () => ['all']),
   };
   const mockZRange = vi.fn(async () => [] as { member: string; score: number }[]);
+  const mockReddit = {
+    getCurrentUser: vi.fn(async () => mockUser),
+    getPostById: vi.fn(async () => ({
+      authorId: 't2_target',
+      permalink: '/r/testsubreddit/comments/xyz/test_post/',
+    })),
+    getCommentById: vi.fn(async () => ({
+      authorId: 't2_target',
+      permalink: '/r/testsubreddit/comments/xyz/test_post/abc/',
+    })),
+    getUserById: vi.fn(async () => ({
+      username: 'targetuser',
+      createdAt: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000),
+      linkKarma: 500,
+      commentKarma: 500,
+    })),
+    submitCustomPost: vi.fn(async () => ({
+      url: 'https://www.reddit.com/r/testsubreddit/comments/abc123/mod_dashboard/',
+    })),
+  };
   return {
     store: new Map<string, string>(),
     mockUser,
+    mockReddit,
     mockContext: {
       userId: 't2_mod123' as string | undefined,
       username: 'testmod',
@@ -29,23 +50,7 @@ vi.mock('@devvit/web/server', () => ({
     zAdd: vi.fn(async () => 0),
     zRange: mockZRange,
   },
-  reddit: {
-    getCurrentUser: vi.fn(async () => mockUser),
-    getPostById: vi.fn(async () => ({
-      authorId: 't2_target',
-      permalink: '/r/testsubreddit/comments/xyz/test_post/',
-    })),
-    getCommentById: vi.fn(async () => ({
-      authorId: 't2_target',
-      permalink: '/r/testsubreddit/comments/xyz/test_post/abc/',
-    })),
-    getUserById: vi.fn(async () => ({
-      username: 'targetuser',
-      createdAt: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000),
-      linkKarma: 500,
-      commentKarma: 500,
-    })),
-  },
+  reddit: mockReddit,
   context: mockContext,
   settings: {
     get: vi.fn(async (key: string) => {
@@ -105,6 +110,10 @@ beforeEach(() => {
   mockUser.getModPermissionsForSubreddit.mockResolvedValue(['all']);
   mockZRange.mockResolvedValue([]);
   mockContext.userId = 't2_mod123';
+  mockReddit.getCurrentUser.mockResolvedValue(mockUser);
+  mockReddit.submitCustomPost.mockResolvedValue({
+    url: 'https://www.reddit.com/r/testsubreddit/comments/abc123/mod_dashboard/',
+  });
 });
 
 // ─── /warn-user ───────────────────────────────────────────────────────────────
@@ -242,5 +251,50 @@ describe('/view-all-warnings', () => {
     const res = await getWarnings();
     expect(res.showForm?.form.fields[0].name).toBe('summary');
     expect(res.showForm?.form.title).toContain('testsubreddit');
+  });
+});
+
+// ─── /create-dashboard-post ───────────────────────────────────────────────────
+
+describe('/create-dashboard-post', () => {
+  async function createDashboard() {
+    const res = await menu.request('/create-dashboard-post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    return res.json() as Promise<{ showToast?: string; navigateTo?: string }>;
+  }
+
+  it('returns no-permission toast when mod lacks permissions', async () => {
+    mockUser.getModPermissionsForSubreddit.mockResolvedValue(['wiki']);
+    const res = await createDashboard();
+    expect(res.showToast).toContain('do not have mod permissions');
+    expect(res.navigateTo).toBeUndefined();
+  });
+
+  it('calls submitCustomPost with correct subredditName and default entry', async () => {
+    await createDashboard();
+    expect(mockReddit.submitCustomPost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subredditName: 'testsubreddit',
+        entry: 'default',
+      })
+    );
+  });
+
+  it('returns navigateTo URL pointing to the created post', async () => {
+    const res = await createDashboard();
+    expect(res.navigateTo).toBe(
+      'https://www.reddit.com/r/testsubreddit/comments/abc123/mod_dashboard/'
+    );
+    expect(res.showToast).toBeUndefined();
+  });
+
+  it('uses the correct post title', async () => {
+    await createDashboard();
+    expect(mockReddit.submitCustomPost).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Mod Dashboard — Strike System' })
+    );
   });
 });
