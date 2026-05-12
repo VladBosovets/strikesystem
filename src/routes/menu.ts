@@ -157,53 +157,43 @@ menu.post('/view-strikes', async (c) => {
     const request = await c.req.json<MenuItemRequest>();
     const targetId = request.targetId;
 
-    const user = await reddit.getCurrentUser();
+    // Wave 1: current user + target content in parallel
+    const [user, authorId] = await Promise.all([
+      reddit.getCurrentUser(),
+      targetId.startsWith('t1_')
+        ? reddit.getCommentById(targetId as `t1_${string}`).then((cm) => cm.authorId)
+        : reddit.getPostById(targetId as `t3_${string}`).then((p) => p.authorId),
+    ]);
+
     if (!user) {
       return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
     }
-
-    let targetUser: { id: string; username: string } | null = null;
-
-    if (targetId.startsWith('t1_')) {
-      const comment = await reddit.getCommentById(targetId as `t1_${string}`);
-      if (!comment.authorId) {
-        return c.json<UiResponse>({ showToast: 'Could not find the comment author.' }, 200);
-      }
-      const author = await reddit.getUserById(comment.authorId);
-      targetUser = { id: comment.authorId, username: author?.username ?? '' };
-    } else if (targetId.startsWith('t3_')) {
-      const post = await reddit.getPostById(targetId as `t3_${string}`);
-      if (!post.authorId) {
-        return c.json<UiResponse>({ showToast: 'Could not find the post author.' }, 200);
-      }
-      const author = await reddit.getUserById(post.authorId);
-      targetUser = { id: post.authorId, username: author?.username ?? '' };
-    }
-
-    if (!targetUser?.username) {
+    if (!authorId) {
       return c.json<UiResponse>({ showToast: 'Could not find the author.' }, 200);
     }
 
-    const modPermissions = await user.getModPermissionsForSubreddit(context.subredditName);
+    // Wave 2: everything that depends on authorId or user, all in parallel
+    const [authorUser, record, notes, maxStrikes, modPermissions] = await Promise.all([
+      reddit.getUserById(authorId as `t2_${string}`),
+      getStrikes(context.subredditId, authorId),
+      getModNotes(context.subredditId, authorId),
+      settings.get<number>('maxStrikes'),
+      user.getModPermissionsForSubreddit(context.subredditName),
+    ]);
+
     const canMod = modPermissions.includes('all') || modPermissions.includes('posts');
     if (!canMod) {
       return c.json<UiResponse>({ showToast: 'You do not have mod permissions.' }, 200);
     }
 
-    const maxStrikes =
-      (await settings.get<number>('maxStrikes')) ?? DEFAULT_CONFIG.maxStrikesBeforeBan;
-
-    const [record, notes, authorUser] = await Promise.all([
-      getStrikes(context.subredditId, targetUser.id),
-      getModNotes(context.subredditId, targetUser.id),
-      reddit.getUserById(targetUser.id as `t2_${string}`),
-    ]);
+    const resolvedMaxStrikes = maxStrikes ?? DEFAULT_CONFIG.maxStrikesBeforeBan;
+    const username = authorUser?.username ?? authorId;
 
     const accountIntel = authorUser
       ? buildAccountIntelDisplay(authorUser)
       : 'Account info unavailable.';
 
-    const strikeHistory = buildStrikeHistoryDisplay(record, maxStrikes);
+    const strikeHistory = buildStrikeHistoryDisplay(record, resolvedMaxStrikes);
 
     const removalDisplay =
       record?.removals?.length
@@ -220,7 +210,7 @@ menu.post('/view-strikes', async (c) => {
     const fields: FormField[] = [
       {
         name: 'accountInfo',
-        label: `Account — u/${targetUser.username}`,
+        label: `Account — u/${username}`,
         type: 'paragraph',
         defaultValue: accountIntel,
       },
@@ -249,9 +239,9 @@ menu.post('/view-strikes', async (c) => {
         showForm: {
           name: 'viewStrikes',
           form: {
-            title: `Strike History — u/${targetUser.username}`,
+            title: `Strike History — u/${username}`,
             fields,
-            acceptLabel: 'Close',
+            acceptLabel: 'Done',
             cancelLabel: 'Close',
           },
         },
