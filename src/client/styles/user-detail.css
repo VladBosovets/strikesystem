@@ -76,3 +76,12 @@
 .ud-list__note { font-size: 12px; color: var(--color-text-muted); font-style: italic; }
 
 .ud-empty { padding: 14px; color: var(--color-text-muted); font-size: 13px; }
+
+.ud-list__link {
+  font-size: 12px;
+  color: var(--color-accent);
+  text-decoration: none;
+  align-self: flex-start;
+}
+
+.ud-list__link:hover { text-decoration: underline; }

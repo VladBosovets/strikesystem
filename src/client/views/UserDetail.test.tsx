@@ -94,4 +94,35 @@ describe('UserDetail', () => {
     await userEvent.click(screen.getByText('← Back'));
     expect(onBack).toHaveBeenCalledOnce();
   });
+
+  it('shows a link to the offending post when postUrl is set', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({
+        ...mockDetail,
+        user: {
+          ...mockDetail.user,
+          strikes: [{ ...mockDetail.user.strikes[0], postUrl: 'https://reddit.com/r/test/comments/abc' }],
+        },
+      }), { status: 200 })
+    );
+    render(<UserDetail userId="t2_u1" username="alice" onBack={vi.fn()} />);
+    await waitFor(() => screen.getByText('u/alice'));
+    const link = screen.getByRole('link', { name: 'View post →' });
+    expect(link.getAttribute('href')).toBe('https://reddit.com/r/test/comments/abc');
+    expect(link.getAttribute('target')).toBe('_blank');
+  });
+
+  it('does not show post link when postUrl is empty', async () => {
+    renderDetail();
+    await waitFor(() => screen.getByText('u/alice'));
+    expect(screen.queryByRole('link', { name: 'View post →' })).toBeNull();
+  });
+
+  it('shows a link to the removed content when contentUrl is set', async () => {
+    renderDetail();
+    await waitFor(() => screen.getByText('u/alice'));
+    const link = screen.getByRole('link', { name: 'View content →' });
+    expect(link.getAttribute('href')).toBe('https://reddit.com/r/x');
+    expect(link.getAttribute('target')).toBe('_blank');
+  });
 });
