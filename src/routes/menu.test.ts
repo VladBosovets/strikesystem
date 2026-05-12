@@ -253,6 +253,24 @@ describe('/view-all-warnings', () => {
     expect(res.showForm?.form.fields[0].name).toBe('summary');
     expect(res.showForm?.form.title).toContain('testsubreddit');
   });
+
+  it('banned user with active strikes appears only in banned section, not double-counted', async () => {
+    mockZRange.mockResolvedValue([
+      { member: 't2_active', score: 1 },
+      { member: 't2_banned', score: 2 },
+    ]);
+    seedStrikeForUser('t2_active', 'activeuser', 1, false);
+    seedStrikeForUser('t2_banned', 'banneduser', 2, true);
+
+    const res = await getWarnings();
+    const label = (res.showForm?.form.fields[0] as { label?: string })?.label ?? '';
+    // totalActive should be 2 (1 active non-banned + 1 banned), not 3
+    expect(label).toBe('2 user(s) with active warnings');
+    const text = res.showForm?.form.fields[0].defaultValue ?? '';
+    // banneduser should appear only in Banned section, not in Active warnings
+    const activeSection = text.split('\n\n')[0] ?? '';
+    expect(activeSection).not.toContain('banneduser');
+  });
 });
 
 // ─── /create-dashboard-post ───────────────────────────────────────────────────
