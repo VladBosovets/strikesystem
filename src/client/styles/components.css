@@ -1,0 +1,69 @@
+.strike-bar {
+  font-family: monospace;
+  letter-spacing: 1px;
+}
+
+.strike-bar__filled { color: var(--color-warning); }
+.strike-bar__empty  { color: var(--color-border); }
+
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  text-align: left;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  transition: background 0.15s;
+}
+
+.user-row:hover { background: #1f2937; }
+
+.user-row--banned { border-color: var(--color-banned); }
+
+.user-row__name   { flex: 1; font-weight: 600; }
+.user-row__strikes { color: var(--color-text-muted); font-size: 12px; }
+
+.user-row__banned-badge {
+  font-size: 12px;
+  color: var(--color-banned);
+  font-weight: 600;
+}
+
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 120px;
+}
+
+.loading-spinner__circle {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-message {
+  padding: 24px;
+  text-align: center;
+  color: var(--color-banned);
+}
+
+.error-message__text { margin-bottom: 12px; }
+
+.error-message__retry {
+  padding: 6px 16px;
+  border: 1px solid var(--color-banned);
+  border-radius: var(--radius);
+  color: var(--color-banned);
+  background: transparent;
+}
+
+.error-message__retry:hover { background: rgba(248,81,73,0.1); }
