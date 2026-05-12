@@ -1,11 +1,21 @@
 import { Hono } from 'hono';
-import { context, settings } from '@devvit/web/server';
+import { context, settings, reddit } from '@devvit/web/server';
 import { DEFAULT_CONFIG, getStrikeRecord, getWarnedUserIds, getModNotes } from '../core/redis';
 import type { DashboardConfigResponse, DashboardUsersResponse, DashboardUserDetailResponse } from '../client/types/api';
 
 export const api = new Hono();
 
+async function isMod(): Promise<boolean> {
+  if (!context.userId) return false;
+  const user = await reddit.getCurrentUser();
+  if (!user) return false;
+  const perms = await user.getModPermissionsForSubreddit(context.subredditName);
+  return perms.includes('all') || perms.includes('posts');
+}
+
 api.get('/dashboard/config', async (c) => {
+  if (!await isMod()) return c.json({ error: 'Forbidden' }, 403);
+
   const maxStrikes =
     (await settings.get<number>('maxStrikes')) ?? DEFAULT_CONFIG.maxStrikesBeforeBan;
   return c.json<DashboardConfigResponse>({
@@ -15,6 +25,8 @@ api.get('/dashboard/config', async (c) => {
 });
 
 api.get('/dashboard/users', async (c) => {
+  if (!await isMod()) return c.json({ error: 'Forbidden' }, 403);
+
   const maxStrikes =
     (await settings.get<number>('maxStrikes')) ?? DEFAULT_CONFIG.maxStrikesBeforeBan;
 
@@ -47,6 +59,8 @@ api.get('/dashboard/users', async (c) => {
 });
 
 api.get('/dashboard/user/:userId', async (c) => {
+  if (!await isMod()) return c.json({ error: 'Forbidden' }, 403);
+
   const userId = c.req.param('userId');
   const maxStrikes =
     (await settings.get<number>('maxStrikes')) ?? DEFAULT_CONFIG.maxStrikesBeforeBan;

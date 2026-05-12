@@ -263,3 +263,13 @@ export async function saveModNotes(
 ): Promise<void> {
   await redis.set(modNotesKey(subredditId, userId), JSON.stringify(notes));
 }
+
+const dashboardPostKey = (subredditId: string) => `dashboard-post:${subredditId}`;
+
+export async function getDashboardPostUrl(subredditId: string): Promise<string | null> {
+  return (await redis.get(dashboardPostKey(subredditId))) ?? null;
+}
+
+export async function saveDashboardPostUrl(subredditId: string, url: string): Promise<void> {
+  await redis.set(dashboardPostKey(subredditId), url);
+}

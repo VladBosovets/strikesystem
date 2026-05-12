@@ -2,12 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── mocks ────────────────────────────────────────────────────────────────────
 
-const { store, mockZRange, mockContext } = vi.hoisted(() => {
+const { store, mockZRange, mockContext, mockUser } = vi.hoisted(() => {
+  const mockUser = {
+    getModPermissionsForSubreddit: vi.fn(async () => ['all'] as string[]),
+  };
   const mockZRange = vi.fn(async () => [] as { member: string; score: number }[]);
   return {
     store: new Map<string, string>(),
     mockZRange,
+    mockUser,
     mockContext: {
+      userId: 't2_mod123' as string | undefined,
       subredditId: 't5_sub123' as string,
       subredditName: 'testsubreddit',
     },
@@ -24,6 +29,9 @@ vi.mock('@devvit/web/server', () => ({
     zRange: mockZRange,
   },
   context: mockContext,
+  reddit: {
+    getCurrentUser: vi.fn(async () => mockUser),
+  },
   settings: {
     get: vi.fn(async (key: string) => {
       if (key === 'maxStrikes') return 3;
@@ -82,7 +90,49 @@ async function get(path: string) {
 beforeEach(() => {
   store.clear();
   mockZRange.mockResolvedValue([]);
-  mockContext.subredditName = 'testsubreddit';
+  mockContext.userId = 't2_mod123';
+  mockUser.getModPermissionsForSubreddit.mockResolvedValue(['all']);
+});
+
+// ─── permission checks ────────────────────────────────────────────────────────
+
+describe('dashboard API — permission checks', () => {
+  it('GET /dashboard/config returns 403 when user has no mod permissions', async () => {
+    mockUser.getModPermissionsForSubreddit.mockResolvedValue(['wiki']);
+    const res = await get('/dashboard/config');
+    expect(res.status).toBe(403);
+  });
+
+  it('GET /dashboard/users returns 403 when user has no mod permissions', async () => {
+    mockUser.getModPermissionsForSubreddit.mockResolvedValue([]);
+    const res = await get('/dashboard/users');
+    expect(res.status).toBe(403);
+  });
+
+  it('GET /dashboard/user/:userId returns 403 when user has no mod permissions', async () => {
+    mockUser.getModPermissionsForSubreddit.mockResolvedValue(['flair']);
+    const res = await get('/dashboard/user/t2_anyone');
+    expect(res.status).toBe(403);
+  });
+
+  it('GET /dashboard/config returns 403 when userId is missing from context', async () => {
+    mockContext.userId = undefined;
+    const res = await get('/dashboard/config');
+    expect(res.status).toBe(403);
+  });
+
+  it('all endpoints return 200 for a user with posts permission', async () => {
+    mockUser.getModPermissionsForSubreddit.mockResolvedValue(['posts']);
+    seedUser('t2_u1', 'alice', 1);
+    const [cfg, users, user] = await Promise.all([
+      get('/dashboard/config'),
+      get('/dashboard/users'),
+      get('/dashboard/user/t2_u1'),
+    ]);
+    expect(cfg.status).toBe(200);
+    expect(users.status).toBe(200);
+    expect(user.status).toBe(200);
+  });
 });
 
 // ─── GET /dashboard/config ────────────────────────────────────────────────────
@@ -162,7 +212,6 @@ describe('GET /dashboard/users', () => {
       { member: 't2_ghost', score: 2 },
     ]);
     seedUser('t2_user1', 'alice', 1);
-    // t2_ghost has no record in store
 
     const res = await get('/dashboard/users');
     const body = await res.json() as { users: { userId: string }[] };
@@ -175,7 +224,6 @@ describe('GET /dashboard/users', () => {
       { member: 't2_stale', score: 1000 },
       { member: 't2_user1', score: 500 },
     ]);
-    // t2_stale was deleted from redis but still in the sorted set index
     seedUser('t2_user1', 'bob', 1);
 
     const res = await get('/dashboard/users');

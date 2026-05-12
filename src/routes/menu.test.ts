@@ -111,6 +111,7 @@ beforeEach(() => {
   mockZRange.mockResolvedValue([]);
   mockContext.userId = 't2_mod123';
   mockReddit.getCurrentUser.mockResolvedValue(mockUser);
+  mockReddit.submitCustomPost.mockClear();
   mockReddit.submitCustomPost.mockResolvedValue({
     url: 'https://www.reddit.com/r/testsubreddit/comments/abc123/mod_dashboard/',
   });
@@ -296,5 +297,24 @@ describe('/create-dashboard-post', () => {
     expect(mockReddit.submitCustomPost).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Mod Dashboard — Strike System' })
     );
+  });
+
+  it('saves the post URL to Redis after creating', async () => {
+    await createDashboard();
+    const stored = store.get(`dashboard-post:${SUB}`);
+    expect(stored).toBe('https://www.reddit.com/r/testsubreddit/comments/abc123/mod_dashboard/');
+  });
+
+  it('navigates to existing post URL without creating a new post', async () => {
+    store.set(`dashboard-post:${SUB}`, 'https://www.reddit.com/r/testsubreddit/comments/existing123/mod_dashboard/');
+    const res = await createDashboard();
+    expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
+    expect(res.navigateTo).toBe('https://www.reddit.com/r/testsubreddit/comments/existing123/mod_dashboard/');
+  });
+
+  it('creates a new post when no URL is stored', async () => {
+    const res = await createDashboard();
+    expect(mockReddit.submitCustomPost).toHaveBeenCalledTimes(1);
+    expect(res.navigateTo).toBe('https://www.reddit.com/r/testsubreddit/comments/abc123/mod_dashboard/');
   });
 });
