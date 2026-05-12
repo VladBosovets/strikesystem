@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { DashboardUser, DashboardUsersResponse } from '../types/api';
 import { UserRow } from '../components/UserRow';
 import { SkeletonList } from '../components/SkeletonList';
@@ -14,6 +15,8 @@ export interface OverviewProps {
 }
 
 export function Overview({ loading, error, data, onSelectUser, onRetry }: OverviewProps) {
+  const [filter, setFilter] = useState('');
+
   if (loading && !data) return <SkeletonList />;
   if (error) return <ErrorMessage message={error} onRetry={onRetry} />;
   if (!data) return null;
@@ -21,6 +24,11 @@ export function Overview({ loading, error, data, onSelectUser, onRetry }: Overvi
   const { users, maxStrikes } = data;
   const activeCount = users.filter((u) => u.activeStrikes > 0 && !u.isBanned).length;
   const bannedCount = users.filter((u) => u.isBanned).length;
+
+  const filterLower = filter.toLowerCase();
+  const visible = filterLower
+    ? users.filter((u) => u.username.toLowerCase().includes(filterLower))
+    : users;
 
   return (
     <div className="overview">
@@ -35,13 +43,27 @@ export function Overview({ loading, error, data, onSelectUser, onRetry }: Overvi
       {users.length === 0 ? (
         <p className="overview-empty">No warned users on record.</p>
       ) : (
-        <ul className="overview-user-list">
-          {users.map((user) => (
-            <li key={user.userId}>
-              <UserRow user={user} maxStrikes={maxStrikes} onClick={onSelectUser} />
-            </li>
-          ))}
-        </ul>
+        <>
+          <input
+            className="overview-filter"
+            type="text"
+            placeholder="Search by username…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            aria-label="Filter users by username"
+          />
+          {visible.length === 0 ? (
+            <p className="overview-empty">No users match your search.</p>
+          ) : (
+            <ul className="overview-user-list">
+              {visible.map((user) => (
+                <li key={user.userId}>
+                  <UserRow user={user} maxStrikes={maxStrikes} onClick={onSelectUser} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </div>
   );
