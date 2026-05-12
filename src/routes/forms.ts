@@ -93,7 +93,7 @@ forms.post('/warn-user-submit', async (c) => {
 });
 
 forms.post('/view-strikes-close', async (c) => {
-  return c.json<UiResponse>({ showToast: '' }, 200);
+  return c.json<UiResponse>({}, 200);
 });
 
 forms.post('/reset-strikes-submit', async (c) => {
