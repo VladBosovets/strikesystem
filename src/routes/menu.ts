@@ -592,7 +592,7 @@ menu.post('/view-all-warnings', async (c) => {
       userIds.map((id) => getStrikeRecord(context.subredditId, id))
     );
 
-    const active = records.filter((r) => r && r.activeStrikes > 0) as NonNullable<typeof records[number]>[];
+    const active = records.filter((r) => r && r.activeStrikes > 0 && !r.isBanned) as NonNullable<typeof records[number]>[];
     const banned = records.filter((r) => r?.isBanned) as NonNullable<typeof records[number]>[];
     const cleared = records.filter((r) => r && !r.isBanned && r.activeStrikes === 0) as NonNullable<typeof records[number]>[];
 
