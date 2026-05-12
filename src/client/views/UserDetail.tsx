@@ -69,6 +69,11 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 <span className="ud-list__label">#{s.strikeNumber} — {s.ruleViolated}</span>
                 <span className="ud-list__meta">{s.issuedAt.slice(0, 10)} · by u/{s.issuedBy}</span>
                 {s.note && <span className="ud-list__note">{s.note}</span>}
+                {s.postUrl && (
+                  <a href={s.postUrl} target="_blank" rel="noreferrer" className="ud-list__link">
+                    View post →
+                  </a>
+                )}
               </li>
             ))}
           </ul>
@@ -101,6 +106,11 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 <span className="ud-list__label">{r.ruleViolated}</span>
                 <span className="ud-list__meta">{r.removedAt.slice(0, 10)} · by u/{r.removedBy}</span>
                 {r.note && <span className="ud-list__note">{r.note}</span>}
+                {r.contentUrl && (
+                  <a href={r.contentUrl} target="_blank" rel="noreferrer" className="ud-list__link">
+                    View content →
+                  </a>
+                )}
               </li>
             ))}
           </ul>
