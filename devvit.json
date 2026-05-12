@@ -20,11 +20,26 @@
         "location": "post",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/warn-user"
+      },
+      {
+        "label": "View Strike History",
+        "description": "View the full warning history for the author of this comment.",
+        "location": "comment",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/view-strikes"
+      },
+      {
+        "label": "View Strike History",
+        "description": "View the full warning history for the author of this post.",
+        "location": "post",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/view-strikes"
       }
     ]
   },
   "forms": {
-    "warnUser": "/internal/form/warn-user-submit"
+    "warnUser": "/internal/form/warn-user-submit",
+    "viewStrikes": "/internal/form/view-strikes-close"
   },
   "triggers": {
     "onAppInstall": "/internal/triggers/on-app-install",

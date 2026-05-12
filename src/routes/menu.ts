@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 import type { FormField } from '@devvit/shared-types/shared/form.js';
 import { reddit, context, settings } from '@devvit/web/server';
-import { getStrikes } from '../core/strikes';
-import { DEFAULT_CONFIG, savePendingWarn } from '../core/redis';
+import { getStrikes, buildAccountIntelDisplay, buildStrikeHistoryDisplay } from '../core/strikes';
+import { DEFAULT_CONFIG, savePendingWarn, getModNotes } from '../core/redis';
 
 export const menu = new Hono();
 
@@ -19,22 +19,23 @@ menu.post('/warn-user', async (c) => {
 
     let targetUser: { id: string; username: string } | null = null;
     let postUrl = '';
+    let authorUser: Awaited<ReturnType<typeof reddit.getUserById>> | null = null;
 
     if (targetId.startsWith('t1_')) {
       const comment = await reddit.getCommentById(targetId as `t1_${string}`);
       if (!comment.authorId) {
         return c.json<UiResponse>({ showToast: 'Could not find the comment author.' }, 200);
       }
-      const author = await reddit.getUserById(comment.authorId);
-      targetUser = { id: comment.authorId, username: author?.username ?? '' };
+      authorUser = await reddit.getUserById(comment.authorId);
+      targetUser = { id: comment.authorId, username: authorUser?.username ?? '' };
       postUrl = `https://reddit.com${comment.permalink}`;
     } else if (targetId.startsWith('t3_')) {
       const post = await reddit.getPostById(targetId as `t3_${string}`);
       if (!post.authorId) {
         return c.json<UiResponse>({ showToast: 'Could not find the post author.' }, 200);
       }
-      const author = await reddit.getUserById(post.authorId);
-      targetUser = { id: post.authorId, username: author?.username ?? '' };
+      authorUser = await reddit.getUserById(post.authorId);
+      targetUser = { id: post.authorId, username: authorUser?.username ?? '' };
       postUrl = `https://reddit.com${post.permalink}`;
     }
 
@@ -93,7 +94,17 @@ menu.post('/warn-user', async (c) => {
       postUrl,
     });
 
+    const accountIntel = authorUser
+      ? buildAccountIntelDisplay(authorUser)
+      : 'Account info unavailable.';
+
     const fields: FormField[] = [
+      {
+        name: 'accountInfo',
+        label: `Account — u/${targetUser.username}`,
+        type: 'paragraph',
+        defaultValue: accountIntel,
+      },
       {
         name: 'history',
         label: 'Warning history',
@@ -137,6 +148,118 @@ menu.post('/warn-user', async (c) => {
     );
   } catch (err) {
     console.error('warn-user menu error:', err);
+    return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
+  }
+});
+
+menu.post('/view-strikes', async (c) => {
+  try {
+    const request = await c.req.json<MenuItemRequest>();
+    const targetId = request.targetId;
+
+    const user = await reddit.getCurrentUser();
+    if (!user) {
+      return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
+    }
+
+    let targetUser: { id: string; username: string } | null = null;
+
+    if (targetId.startsWith('t1_')) {
+      const comment = await reddit.getCommentById(targetId as `t1_${string}`);
+      if (!comment.authorId) {
+        return c.json<UiResponse>({ showToast: 'Could not find the comment author.' }, 200);
+      }
+      const author = await reddit.getUserById(comment.authorId);
+      targetUser = { id: comment.authorId, username: author?.username ?? '' };
+    } else if (targetId.startsWith('t3_')) {
+      const post = await reddit.getPostById(targetId as `t3_${string}`);
+      if (!post.authorId) {
+        return c.json<UiResponse>({ showToast: 'Could not find the post author.' }, 200);
+      }
+      const author = await reddit.getUserById(post.authorId);
+      targetUser = { id: post.authorId, username: author?.username ?? '' };
+    }
+
+    if (!targetUser?.username) {
+      return c.json<UiResponse>({ showToast: 'Could not find the author.' }, 200);
+    }
+
+    const modPermissions = await user.getModPermissionsForSubreddit(context.subredditName);
+    const canMod = modPermissions.includes('all') || modPermissions.includes('posts');
+    if (!canMod) {
+      return c.json<UiResponse>({ showToast: 'You do not have mod permissions.' }, 200);
+    }
+
+    const maxStrikes =
+      (await settings.get<number>('maxStrikes')) ?? DEFAULT_CONFIG.maxStrikesBeforeBan;
+
+    const [record, notes, authorUser] = await Promise.all([
+      getStrikes(context.subredditId, targetUser.id),
+      getModNotes(context.subredditId, targetUser.id),
+      reddit.getUserById(targetUser.id as `t2_${string}`),
+    ]);
+
+    const accountIntel = authorUser
+      ? buildAccountIntelDisplay(authorUser)
+      : 'Account info unavailable.';
+
+    const strikeHistory = buildStrikeHistoryDisplay(record, maxStrikes);
+
+    const removalDisplay =
+      record?.removals?.length
+        ? record.removals
+            .map((r) => `[${r.removedAt.slice(0, 10)}] u/${r.removedBy} — ${r.ruleViolated}${r.note ? `\n  Note: ${r.note}` : ''}`)
+            .join('\n')
+        : 'No removals logged.';
+
+    const notesDisplay =
+      notes.length
+        ? notes.map((n, i) => `#${i + 1} [${n.createdAt.slice(0, 10)}] u/${n.author}:\n  ${n.text}`).join('\n')
+        : 'No mod notes yet.';
+
+    const fields: FormField[] = [
+      {
+        name: 'accountInfo',
+        label: `Account — u/${targetUser.username}`,
+        type: 'paragraph',
+        defaultValue: accountIntel,
+      },
+      {
+        name: 'strikeHistory',
+        label: 'Warning history',
+        type: 'paragraph',
+        defaultValue: strikeHistory,
+      },
+      {
+        name: 'removalLog',
+        label: 'Content removals',
+        type: 'paragraph',
+        defaultValue: removalDisplay,
+      },
+      {
+        name: 'modNotes',
+        label: 'Mod notes',
+        type: 'paragraph',
+        defaultValue: notesDisplay,
+      },
+    ];
+
+    return c.json<UiResponse>(
+      {
+        showForm: {
+          name: 'viewStrikes',
+          form: {
+            title: `Strike History — u/${targetUser.username}`,
+            fields,
+            acceptLabel: 'Close',
+            cancelLabel: 'Close',
+          },
+        },
+      },
+      200
+    );
+  } catch (err) {
+    console.error('view-strikes menu error:', err);
     return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
   }
 });

@@ -1,4 +1,5 @@
 import { reddit, settings } from '@devvit/web/server';
+import type { User } from '@devvit/reddit';
 import {
   getStrikeRecord,
   saveStrikeRecord,
@@ -201,4 +202,53 @@ function buildBanReason(record: StrikeRecord): string {
     (s) => `Warning ${s.strikeNumber}: ${s.ruleViolated} (${s.issuedAt.slice(0, 10)})`
   );
   return `Auto-banned after ${record.totalStrikes} warning(s):\n${lines.join('\n')}`;
+}
+
+export function buildAccountIntelDisplay(user: User): string {
+  const ageDays = Math.floor(
+    (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const totalKarma = user.linkKarma + user.commentKarma;
+
+  const ageLabel =
+    ageDays < 7   ? `${ageDays}d  🚨 Very new account` :
+    ageDays < 30  ? `${ageDays}d  ⚠️ New account` :
+    ageDays < 365 ? `${Math.floor(ageDays / 30)}mo` :
+                    `${Math.floor(ageDays / 365)}yr`;
+
+  const karmaLabel =
+    totalKarma < 10  ? `${totalKarma}  🚨 Almost zero karma` :
+    totalKarma < 100 ? `${totalKarma}  ⚠️ Very low karma` :
+                       String(totalKarma);
+
+  return [
+    `Account age:  ${ageLabel}`,
+    `Karma:        ${karmaLabel} (${user.linkKarma} post / ${user.commentKarma} comment)`,
+  ].join('\n');
+}
+
+export function buildStrikeHistoryDisplay(
+  record: StrikeRecord | null,
+  maxStrikes: number
+): string {
+  if (!record || record.strikes.length === 0) return 'No warnings on record.';
+
+  const lines: string[] = [];
+
+  lines.push(`Active: ${record.activeStrikes}/${maxStrikes}  |  All-time: ${record.totalStrikes}`);
+  if (record.isBanned) lines.push('⛔ Currently banned');
+  lines.push('');
+
+  for (const s of record.strikes) {
+    lines.push(`#${s.strikeNumber} [${s.issuedAt.slice(0, 10)}] by u/${s.issuedBy}`);
+    lines.push(`  Rule: ${s.ruleViolated}`);
+    if (s.note) lines.push(`  Note: ${s.note}`);
+  }
+
+  for (const r of record.resets) {
+    lines.push(`— Reset on ${r.resetAt.slice(0, 10)} by u/${r.resetBy} (had ${r.strikesAtReset} active strikes)`);
+    if (r.reason) lines.push(`  Reason: ${r.reason}`);
+  }
+
+  return lines.join('\n');
 }

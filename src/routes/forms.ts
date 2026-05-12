@@ -90,3 +90,7 @@ forms.post('/warn-user-submit', async (c) => {
     return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
   }
 });
+
+forms.post('/view-strikes-close', async (c) => {
+  return c.json<UiResponse>({ showToast: '' }, 200);
+});
