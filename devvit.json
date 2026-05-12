@@ -48,13 +48,28 @@
         "location": "post",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/reset-strikes"
+      },
+      {
+        "label": "Add Mod Note",
+        "description": "Attach a private moderator note to the author of this comment.",
+        "location": "comment",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/add-mod-note"
+      },
+      {
+        "label": "Add Mod Note",
+        "description": "Attach a private moderator note to the author of this post.",
+        "location": "post",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/add-mod-note"
       }
     ]
   },
   "forms": {
     "warnUser": "/internal/form/warn-user-submit",
     "viewStrikes": "/internal/form/view-strikes-close",
-    "resetStrikes": "/internal/form/reset-strikes-submit"
+    "resetStrikes": "/internal/form/reset-strikes-submit",
+    "addModNote": "/internal/form/add-mod-note-submit"
   },
   "triggers": {
     "onAppInstall": "/internal/triggers/on-app-install",

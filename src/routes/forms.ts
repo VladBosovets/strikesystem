@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import type { UiResponse } from '@devvit/web/shared';
 import { reddit, context } from '@devvit/web/server';
 import { addStrike, checkAndBan, buildWarningDM, resetStrikes } from '../core/strikes';
-import { popPendingWarn, popPendingReset } from '../core/redis';
+import { popPendingWarn, popPendingReset, popPendingModNote, getModNotes, saveModNotes } from '../core/redis';
+import type { ModNote } from '../core/redis';
 
 type WarnUserFormValues = {
   history?: string;
@@ -135,6 +136,44 @@ forms.post('/reset-strikes-submit', async (c) => {
     );
   } catch (err) {
     console.error('reset-strikes-submit error:', err);
+    return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
+  }
+});
+
+forms.post('/add-mod-note-submit', async (c) => {
+  try {
+    const values = await c.req.json<{ note?: string }>();
+
+    const modUserId = context.userId;
+    if (!modUserId) {
+      return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
+    }
+
+    const pending = await popPendingModNote(context.subredditId, modUserId);
+    if (!pending) {
+      return c.json<UiResponse>({ showToast: 'Session expired. Please try again.' }, 200);
+    }
+
+    const noteText = values.note?.trim() ?? '';
+    if (!noteText) {
+      return c.json<UiResponse>({ showToast: 'Note cannot be empty.' }, 200);
+    }
+
+    const existing = await getModNotes(context.subredditId, pending.userId);
+    const newNote: ModNote = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      text: noteText,
+      author: context.username ?? 'moderator',
+      createdAt: new Date().toISOString(),
+    };
+    await saveModNotes(context.subredditId, pending.userId, [...existing, newNote]);
+
+    return c.json<UiResponse>(
+      { showToast: `Mod note saved for u/${pending.username}.` },
+      200
+    );
+  } catch (err) {
+    console.error('add-mod-note-submit error:', err);
     return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
   }
 });
