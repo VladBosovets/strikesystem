@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { DashboardUser } from './types/api';
 import { Overview } from './views/Overview';
+import { UserDetail } from './views/UserDetail';
 import { useDashboard } from './hooks/useDashboard';
 import './styles/global.css';
 
@@ -28,11 +29,11 @@ export function App() {
     );
   }
 
-  // user-detail view will be built in step 5
   return (
-    <div>
-      <button onClick={() => setView({ name: 'overview' })}>← Back</button>
-      <p>Loading user {view.username}…</p>
-    </div>
+    <UserDetail
+      userId={view.userId}
+      username={view.username}
+      onBack={() => setView({ name: 'overview' })}
+    />
   );
 }
