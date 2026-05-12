@@ -53,7 +53,7 @@ menu.post('/warn-user', async (c) => {
     }
 
     const existing = await getStrikes(context.subredditId, targetUser.id);
-    const currentStrikes = existing?.totalStrikes ?? 0;
+    const currentStrikes = existing?.activeStrikes ?? 0;
     const maxStrikes =
       (await settings.get<number>('maxStrikes')) ??
       DEFAULT_CONFIG.maxStrikesBeforeBan;
@@ -65,8 +65,8 @@ menu.post('/warn-user', async (c) => {
 
     let historyText =
       currentStrikes === 0
-        ? 'No previous warnings.'
-        : `Current warnings: ${currentStrikes}/${maxStrikes}`;
+        ? 'No active warnings.'
+        : `Active warnings: ${currentStrikes}/${maxStrikes}`;
 
     if (existing?.strikes?.length) {
       const lines = existing.strikes.map(
