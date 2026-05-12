@@ -9,11 +9,37 @@ export type StrikeEntry = {
   postUrl: string;
 };
 
+export type ResetEntry = {
+  resetAt: string;
+  resetBy: string;
+  reason: string;
+  strikesAtReset: number;
+};
+
+export type RemovalEntry = {
+  contentId: string;
+  contentUrl: string;
+  ruleViolated: string;
+  note: string;
+  removedBy: string;
+  removedAt: string;
+};
+
+export type ModNote = {
+  id: string;
+  text: string;
+  author: string;
+  createdAt: string;
+};
+
 export type StrikeRecord = {
   userId: string;
   username: string;
   strikes: StrikeEntry[];
+  resets: ResetEntry[];
+  removals: RemovalEntry[];
   totalStrikes: number;
+  activeStrikes: number;
   isBanned: boolean;
   lastUpdated: string;
 };
@@ -40,7 +66,7 @@ export type PendingWarn = {
   postUrl: string;
 };
 
-const PENDING_WARN_TTL_SECONDS = 900; // 15 minutes
+const PENDING_WARN_TTL_SECONDS = 900;
 
 const strikeKey = (subredditId: string, userId: string) =>
   `strikes:${subredditId}:${userId}`;
@@ -50,12 +76,27 @@ const configKey = (subredditId: string) => `config:${subredditId}`;
 const pendingWarnKey = (subredditId: string, modUserId: string) =>
   `warn-pending:${subredditId}:${modUserId}`;
 
+const modNotesKey = (subredditId: string, userId: string) =>
+  `mod-notes:${subredditId}:${userId}`;
+
+// Fills in fields that old records (saved before Phase 2) won't have.
+function normalizeRecord(raw: Partial<StrikeRecord> & Pick<StrikeRecord, 'userId' | 'username' | 'totalStrikes' | 'isBanned' | 'lastUpdated'>): StrikeRecord {
+  return {
+    ...raw,
+    strikes: raw.strikes ?? [],
+    resets: raw.resets ?? [],
+    removals: raw.removals ?? [],
+    activeStrikes: raw.activeStrikes ?? raw.totalStrikes,
+  } as StrikeRecord;
+}
+
 export async function getStrikeRecord(
   subredditId: string,
   userId: string
 ): Promise<StrikeRecord | null> {
   const raw = await redis.get(strikeKey(subredditId, userId));
-  return raw ? (JSON.parse(raw) as StrikeRecord) : null;
+  if (!raw) return null;
+  return normalizeRecord(JSON.parse(raw) as Parameters<typeof normalizeRecord>[0]);
 }
 
 export async function saveStrikeRecord(
@@ -104,4 +145,20 @@ export async function popPendingWarn(
   if (!raw) return null;
   await redis.del(key);
   return JSON.parse(raw) as PendingWarn;
+}
+
+export async function getModNotes(
+  subredditId: string,
+  userId: string
+): Promise<ModNote[]> {
+  const raw = await redis.get(modNotesKey(subredditId, userId));
+  return raw ? (JSON.parse(raw) as ModNote[]) : [];
+}
+
+export async function saveModNotes(
+  subredditId: string,
+  userId: string,
+  notes: ModNote[]
+): Promise<void> {
+  await redis.set(modNotesKey(subredditId, userId), JSON.stringify(notes));
 }

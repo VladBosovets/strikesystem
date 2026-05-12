@@ -5,9 +5,12 @@ import {
   DEFAULT_CONFIG,
   type StrikeRecord,
   type Config,
+  type ResetEntry,
 } from './redis';
 
 export type { StrikeRecord, Config };
+
+export type { ResetEntry };
 
 export type AddStrikeData = {
   username: string;
@@ -49,32 +52,38 @@ export async function addStrike(
   const config = await loadConfig();
   const existing = await getStrikeRecord(subredditId, userId);
 
-  const newStrikeNumber = (existing?.totalStrikes ?? 0) + 1;
+  const newTotalStrikes = (existing?.totalStrikes ?? 0) + 1;
+  const newActiveStrikes = (existing?.activeStrikes ?? existing?.totalStrikes ?? 0) + 1;
 
   const record: StrikeRecord = existing ?? {
     userId,
     username: data.username,
     strikes: [],
+    resets: [],
+    removals: [],
     totalStrikes: 0,
+    activeStrikes: 0,
     isBanned: false,
     lastUpdated: new Date().toISOString(),
   };
 
   record.strikes.push({
-    strikeNumber: newStrikeNumber,
+    strikeNumber: newTotalStrikes,
     ruleViolated: data.ruleViolated,
     note: data.note,
     issuedBy: data.issuedBy,
     issuedAt: new Date().toISOString(),
     postUrl: data.postUrl,
   });
-  record.totalStrikes = newStrikeNumber;
+  record.totalStrikes = newTotalStrikes;
+  record.activeStrikes = newActiveStrikes;
   record.username = data.username;
   record.lastUpdated = new Date().toISOString();
 
   await saveStrikeRecord(subredditId, userId, record);
 
-  return { newTotal: newStrikeNumber, config };
+  // newTotal is activeStrikes — this is what mods see in toasts and DMs
+  return { newTotal: newActiveStrikes, config };
 }
 
 export async function checkAndBan(
@@ -85,7 +94,7 @@ export async function checkAndBan(
   const config = await loadConfig();
   const record = await getStrikeRecord(subredditId, userId);
   if (!record || record.isBanned) return false;
-  if (record.totalStrikes < config.maxStrikesBeforeBan) return false;
+  if (record.activeStrikes < config.maxStrikesBeforeBan) return false;
 
   const banReason = buildBanReason(record);
 
@@ -118,15 +127,29 @@ export async function checkAndBan(
 
 export async function resetStrikes(
   subredditId: string,
-  userId: string
-): Promise<void> {
+  userId: string,
+  resetBy: string,
+  reason: string
+): Promise<number | null> {
   const record = await getStrikeRecord(subredditId, userId);
-  if (!record) return;
-  record.strikes = [];
-  record.totalStrikes = 0;
+  if (!record) return null;
+
+  const strikesAtReset = record.activeStrikes;
+
+  const resetEntry: ResetEntry = {
+    resetAt: new Date().toISOString(),
+    resetBy,
+    reason,
+    strikesAtReset,
+  };
+
+  record.resets.push(resetEntry);
+  record.activeStrikes = 0;
   record.isBanned = false;
   record.lastUpdated = new Date().toISOString();
+
   await saveStrikeRecord(subredditId, userId, record);
+  return strikesAtReset;
 }
 
 export function buildWarningDM(
