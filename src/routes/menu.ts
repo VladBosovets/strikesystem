@@ -104,12 +104,14 @@ menu.post('/warn-user', async (c) => {
         label: `Account — u/${targetUser.username}`,
         type: 'paragraph',
         defaultValue: accountIntel,
+        lineHeight: 3,
       },
       {
         name: 'history',
         label: 'Warning history',
         type: 'paragraph',
         defaultValue: historyText,
+        lineHeight: 5,
       },
       {
         name: 'rule',
@@ -213,24 +215,28 @@ menu.post('/view-strikes', async (c) => {
         label: `Account — u/${username}`,
         type: 'paragraph',
         defaultValue: accountIntel,
+        lineHeight: 3,
       },
       {
         name: 'strikeHistory',
         label: 'Warning history',
         type: 'paragraph',
         defaultValue: strikeHistory,
+        lineHeight: 8,
       },
       {
         name: 'removalLog',
         label: 'Content removals',
         type: 'paragraph',
         defaultValue: removalDisplay,
+        lineHeight: 5,
       },
       {
         name: 'modNotes',
         label: 'Mod notes',
         type: 'paragraph',
         defaultValue: notesDisplay,
+        lineHeight: 5,
       },
     ];
 
