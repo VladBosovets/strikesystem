@@ -3,7 +3,7 @@ import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 import type { FormField } from '@devvit/shared-types/shared/form.js';
 import { reddit, context, settings } from '@devvit/web/server';
 import { getStrikes, buildAccountIntelDisplay, buildStrikeHistoryDisplay } from '../core/strikes';
-import { DEFAULT_CONFIG, savePendingWarn, getModNotes, savePendingReset, savePendingModNote, savePendingRemoval, getWarnedUserIds, getStrikeRecord, getDashboardPostUrl, saveDashboardPostUrl } from '../core/redis';
+import { DEFAULT_CONFIG, savePendingWarn, getModNotes, savePendingReset, savePendingModNote, savePendingRemoval, getWarnedUserIds, getStrikeRecord, getDashboardPost, saveDashboardPost } from '../core/redis';
 
 export const menu = new Hono();
 
@@ -547,9 +547,9 @@ menu.post('/create-dashboard-post', async (c) => {
       return c.json<UiResponse>({ showToast: 'You do not have mod permissions.' }, 200);
     }
 
-    const existingUrl = await getDashboardPostUrl(context.subredditId);
-    if (existingUrl) {
-      return c.json<UiResponse>({ navigateTo: existingUrl }, 200);
+    const existing = await getDashboardPost(context.subredditId);
+    if (existing) {
+      return c.json<UiResponse>({ navigateTo: existing.url }, 200);
     }
 
     const post = await reddit.submitCustomPost({
@@ -558,7 +558,7 @@ menu.post('/create-dashboard-post', async (c) => {
       entry: 'default',
     });
 
-    await saveDashboardPostUrl(context.subredditId, post.url);
+    await saveDashboardPost(context.subredditId, post.id, post.url);
     return c.json<UiResponse>({ navigateTo: post.url }, 200);
   } catch (err) {
     console.error('create-dashboard-post menu error:', err);

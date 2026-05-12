@@ -24,6 +24,7 @@ const { store, mockUser, mockReddit, mockContext, mockZRange } = vi.hoisted(() =
       commentKarma: 500,
     })),
     submitCustomPost: vi.fn(async () => ({
+      id: 't3_abc123',
       url: 'https://www.reddit.com/r/testsubreddit/comments/abc123/mod_dashboard/',
     })),
   };
@@ -113,6 +114,7 @@ beforeEach(() => {
   mockReddit.getCurrentUser.mockResolvedValue(mockUser);
   mockReddit.submitCustomPost.mockClear();
   mockReddit.submitCustomPost.mockResolvedValue({
+    id: 't3_abc123',
     url: 'https://www.reddit.com/r/testsubreddit/comments/abc123/mod_dashboard/',
   });
 });
@@ -317,14 +319,20 @@ describe('/create-dashboard-post', () => {
     );
   });
 
-  it('saves the post URL to Redis after creating', async () => {
+  it('saves the post id and URL to Redis after creating', async () => {
     await createDashboard();
     const stored = store.get(`dashboard-post:${SUB}`);
-    expect(stored).toBe('https://www.reddit.com/r/testsubreddit/comments/abc123/mod_dashboard/');
+    expect(JSON.parse(stored!)).toEqual({
+      id: 't3_abc123',
+      url: 'https://www.reddit.com/r/testsubreddit/comments/abc123/mod_dashboard/',
+    });
   });
 
   it('navigates to existing post URL without creating a new post', async () => {
-    store.set(`dashboard-post:${SUB}`, 'https://www.reddit.com/r/testsubreddit/comments/existing123/mod_dashboard/');
+    store.set(`dashboard-post:${SUB}`, JSON.stringify({
+      id: 't3_existing123',
+      url: 'https://www.reddit.com/r/testsubreddit/comments/existing123/mod_dashboard/',
+    }));
     const res = await createDashboard();
     expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
     expect(res.navigateTo).toBe('https://www.reddit.com/r/testsubreddit/comments/existing123/mod_dashboard/');

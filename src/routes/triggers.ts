@@ -5,6 +5,8 @@ import type {
   OnCommentDeleteRequest,
   TriggerResponse,
 } from '@devvit/web/shared';
+import { context } from '@devvit/web/server';
+import { getDashboardPost, clearDashboardPost } from '../core/redis';
 
 export const triggers = new Hono();
 
@@ -16,11 +18,11 @@ triggers.post('/on-app-install', async (c) => {
 
 triggers.post('/on-post-delete', async (c) => {
   const input = await c.req.json<OnPostDeleteRequest>();
-  // Strike records are stored per-user, not per-post — no post-specific
-  // data to remove. Log for audit purposes only.
-  console.log(
-    `Post deleted: ${input.postId} by u/${input.author?.name ?? 'unknown'} in r/${input.subreddit?.name ?? 'unknown'}`
-  );
+  const stored = await getDashboardPost(context.subredditId);
+  if (stored && stored.id === input.postId) {
+    await clearDashboardPost(context.subredditId);
+    console.log(`Dashboard post ${input.postId} deleted — cleared stored ref for r/${input.subreddit?.name ?? 'unknown'}`);
+  }
   return c.json<TriggerResponse>({}, 200);
 });
 

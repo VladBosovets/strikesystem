@@ -266,10 +266,18 @@ export async function saveModNotes(
 
 const dashboardPostKey = (subredditId: string) => `dashboard-post:${subredditId}`;
 
-export async function getDashboardPostUrl(subredditId: string): Promise<string | null> {
-  return (await redis.get(dashboardPostKey(subredditId))) ?? null;
+export type DashboardPostRef = { id: string; url: string };
+
+export async function getDashboardPost(subredditId: string): Promise<DashboardPostRef | null> {
+  const raw = await redis.get(dashboardPostKey(subredditId));
+  if (!raw) return null;
+  return JSON.parse(raw) as DashboardPostRef;
 }
 
-export async function saveDashboardPostUrl(subredditId: string, url: string): Promise<void> {
-  await redis.set(dashboardPostKey(subredditId), url);
+export async function saveDashboardPost(subredditId: string, id: string, url: string): Promise<void> {
+  await redis.set(dashboardPostKey(subredditId), JSON.stringify({ id, url }));
+}
+
+export async function clearDashboardPost(subredditId: string): Promise<void> {
+  await redis.del(dashboardPostKey(subredditId));
 }
