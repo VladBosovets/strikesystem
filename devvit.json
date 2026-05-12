@@ -34,12 +34,27 @@
         "location": "post",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/view-strikes"
+      },
+      {
+        "label": "Reset Strikes",
+        "description": "Clear active warnings for the author of this comment.",
+        "location": "comment",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/reset-strikes"
+      },
+      {
+        "label": "Reset Strikes",
+        "description": "Clear active warnings for the author of this post.",
+        "location": "post",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/reset-strikes"
       }
     ]
   },
   "forms": {
     "warnUser": "/internal/form/warn-user-submit",
-    "viewStrikes": "/internal/form/view-strikes-close"
+    "viewStrikes": "/internal/form/view-strikes-close",
+    "resetStrikes": "/internal/form/reset-strikes-submit"
   },
   "triggers": {
     "onAppInstall": "/internal/triggers/on-app-install",

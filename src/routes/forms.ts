@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import type { UiResponse } from '@devvit/web/shared';
 import { reddit, context } from '@devvit/web/server';
-import { addStrike, checkAndBan, buildWarningDM } from '../core/strikes';
-import { popPendingWarn } from '../core/redis';
+import { addStrike, checkAndBan, buildWarningDM, resetStrikes } from '../core/strikes';
+import { popPendingWarn, popPendingReset } from '../core/redis';
 
 type WarnUserFormValues = {
   history?: string;
@@ -93,4 +93,48 @@ forms.post('/warn-user-submit', async (c) => {
 
 forms.post('/view-strikes-close', async (c) => {
   return c.json<UiResponse>({ showToast: '' }, 200);
+});
+
+forms.post('/reset-strikes-submit', async (c) => {
+  try {
+    const values = await c.req.json<{ reason?: string }>();
+
+    const modUserId = context.userId;
+    if (!modUserId) {
+      return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
+    }
+
+    const pending = await popPendingReset(context.subredditId, modUserId);
+    if (!pending) {
+      return c.json<UiResponse>({ showToast: 'Session expired. Please try again.' }, 200);
+    }
+
+    const reason = values.reason?.trim() ?? '';
+    if (!reason) {
+      return c.json<UiResponse>({ showToast: 'Please provide a reason for the reset.' }, 200);
+    }
+
+    const resetBy = context.username ?? 'moderator';
+    const strikesCleared = await resetStrikes(
+      context.subredditId,
+      pending.userId,
+      resetBy,
+      reason
+    );
+
+    if (strikesCleared === null) {
+      return c.json<UiResponse>(
+        { showToast: `No strike record found for u/${pending.username}.` },
+        200
+      );
+    }
+
+    return c.json<UiResponse>(
+      { showToast: `Warnings reset for u/${pending.username}. ${strikesCleared} active warning(s) cleared.` },
+      200
+    );
+  } catch (err) {
+    console.error('reset-strikes-submit error:', err);
+    return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
+  }
 });

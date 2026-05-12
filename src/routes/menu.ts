@@ -3,7 +3,7 @@ import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 import type { FormField } from '@devvit/shared-types/shared/form.js';
 import { reddit, context, settings } from '@devvit/web/server';
 import { getStrikes, buildAccountIntelDisplay, buildStrikeHistoryDisplay } from '../core/strikes';
-import { DEFAULT_CONFIG, savePendingWarn, getModNotes } from '../core/redis';
+import { DEFAULT_CONFIG, savePendingWarn, getModNotes, savePendingReset } from '../core/redis';
 
 export const menu = new Hono();
 
@@ -260,6 +260,104 @@ menu.post('/view-strikes', async (c) => {
     );
   } catch (err) {
     console.error('view-strikes menu error:', err);
+    return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
+  }
+});
+
+menu.post('/reset-strikes', async (c) => {
+  try {
+    const request = await c.req.json<MenuItemRequest>();
+    const targetId = request.targetId;
+
+    const user = await reddit.getCurrentUser();
+    if (!user) {
+      return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
+    }
+
+    let targetUser: { id: string; username: string } | null = null;
+
+    if (targetId.startsWith('t1_')) {
+      const comment = await reddit.getCommentById(targetId as `t1_${string}`);
+      if (!comment.authorId) {
+        return c.json<UiResponse>({ showToast: 'Could not find the comment author.' }, 200);
+      }
+      const author = await reddit.getUserById(comment.authorId);
+      targetUser = { id: comment.authorId, username: author?.username ?? '' };
+    } else if (targetId.startsWith('t3_')) {
+      const post = await reddit.getPostById(targetId as `t3_${string}`);
+      if (!post.authorId) {
+        return c.json<UiResponse>({ showToast: 'Could not find the post author.' }, 200);
+      }
+      const author = await reddit.getUserById(post.authorId);
+      targetUser = { id: post.authorId, username: author?.username ?? '' };
+    }
+
+    if (!targetUser?.username) {
+      return c.json<UiResponse>({ showToast: 'Could not find the author.' }, 200);
+    }
+
+    const modPermissions = await user.getModPermissionsForSubreddit(context.subredditName);
+    const canMod = modPermissions.includes('all') || modPermissions.includes('posts');
+    if (!canMod) {
+      return c.json<UiResponse>({ showToast: 'You do not have mod permissions.' }, 200);
+    }
+
+    const [existing, maxStrikes] = await Promise.all([
+      getStrikes(context.subredditId, targetUser.id),
+      settings.get<number>('maxStrikes').then((v) => v ?? DEFAULT_CONFIG.maxStrikesBeforeBan),
+    ]);
+
+    if (!existing || existing.activeStrikes === 0) {
+      return c.json<UiResponse>(
+        { showToast: `u/${targetUser.username} has no active warnings to reset.` },
+        200
+      );
+    }
+
+    const modUserId = context.userId;
+    if (!modUserId) {
+      return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
+    }
+
+    await savePendingReset(context.subredditId, modUserId, {
+      userId: targetUser.id,
+      username: targetUser.username,
+    });
+
+    const statusText = `Active warnings: ${existing.activeStrikes}/${maxStrikes}${existing.isBanned ? '\n⛔ User is currently banned — reset will also clear the ban flag.' : ''}`;
+
+    const fields: FormField[] = [
+      {
+        name: 'status',
+        label: `Current status — u/${targetUser.username}`,
+        type: 'paragraph',
+        defaultValue: statusText,
+      },
+      {
+        name: 'reason',
+        label: 'Reason for reset',
+        type: 'paragraph',
+        required: true,
+        defaultValue: '',
+      },
+    ];
+
+    return c.json<UiResponse>(
+      {
+        showForm: {
+          name: 'resetStrikes',
+          form: {
+            title: `Reset Warnings — u/${targetUser.username}`,
+            fields,
+            acceptLabel: 'Reset Warnings',
+            cancelLabel: 'Cancel',
+          },
+        },
+      },
+      200
+    );
+  } catch (err) {
+    console.error('reset-strikes menu error:', err);
     return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
   }
 });

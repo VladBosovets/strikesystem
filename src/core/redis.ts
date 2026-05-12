@@ -66,6 +66,11 @@ export type PendingWarn = {
   postUrl: string;
 };
 
+export type PendingReset = {
+  userId: string;
+  username: string;
+};
+
 const PENDING_WARN_TTL_SECONDS = 900;
 
 const strikeKey = (subredditId: string, userId: string) =>
@@ -75,6 +80,9 @@ const configKey = (subredditId: string) => `config:${subredditId}`;
 
 const pendingWarnKey = (subredditId: string, modUserId: string) =>
   `warn-pending:${subredditId}:${modUserId}`;
+
+const pendingResetKey = (subredditId: string, modUserId: string) =>
+  `reset-pending:${subredditId}:${modUserId}`;
 
 const modNotesKey = (subredditId: string, userId: string) =>
   `mod-notes:${subredditId}:${userId}`;
@@ -145,6 +153,27 @@ export async function popPendingWarn(
   if (!raw) return null;
   await redis.del(key);
   return JSON.parse(raw) as PendingWarn;
+}
+
+export async function savePendingReset(
+  subredditId: string,
+  modUserId: string,
+  data: PendingReset
+): Promise<void> {
+  const key = pendingResetKey(subredditId, modUserId);
+  await redis.set(key, JSON.stringify(data));
+  await redis.expire(key, PENDING_WARN_TTL_SECONDS);
+}
+
+export async function popPendingReset(
+  subredditId: string,
+  modUserId: string
+): Promise<PendingReset | null> {
+  const key = pendingResetKey(subredditId, modUserId);
+  const raw = await redis.get(key);
+  if (!raw) return null;
+  await redis.del(key);
+  return JSON.parse(raw) as PendingReset;
 }
 
 export async function getModNotes(
