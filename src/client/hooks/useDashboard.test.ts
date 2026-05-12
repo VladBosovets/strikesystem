@@ -61,6 +61,29 @@ describe('useDashboard — state', () => {
     expect(result.current.error).toContain('500');
     expect(result.current.data).toBeNull();
   });
+
+  it('keeps previous data visible while a background refresh is in flight', async () => {
+    let resolveSecond!: (r: Response) => void;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+      .mockImplementationOnce(() => new Promise<Response>((res) => { resolveSecond = res; }));
+
+    const { result } = renderHook(() => useDashboard());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.data).not.toBeNull();
+
+    // manually trigger a second load (simulates the 30s interval firing)
+    act(() => { void result.current.reload(); });
+
+    // loading is true again but previous data is still accessible
+    await waitFor(() => expect(result.current.loading).toBe(true));
+    expect(result.current.data?.users).toHaveLength(1);
+
+    // resolve the second fetch
+    act(() => { resolveSecond(new Response(JSON.stringify(mockResponse), { status: 200 })); });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
 });
 
 // ─── timer tests (fake setInterval only) ─────────────────────────────────────

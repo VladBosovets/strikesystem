@@ -3,23 +3,22 @@ import type { DashboardUsersResponse } from '../types/api';
 
 const REFRESH_INTERVAL_MS = 30_000;
 
-type State =
-  | { status: 'loading' }
-  | { status: 'error'; message: string }
-  | { status: 'success'; data: DashboardUsersResponse };
-
 export function useDashboard() {
-  const [state, setState] = useState<State>({ status: 'loading' });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<DashboardUsersResponse | null>(null);
 
   const load = useCallback(async () => {
-    setState({ status: 'loading' });
+    setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/dashboard/users');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as DashboardUsersResponse;
-      setState({ status: 'success', data });
+      setData((await res.json()) as DashboardUsersResponse);
     } catch (err) {
-      setState({ status: 'error', message: err instanceof Error ? err.message : 'Unknown error' });
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -29,10 +28,5 @@ export function useDashboard() {
     return () => { clearInterval(id); };
   }, [load]);
 
-  return {
-    loading: state.status === 'loading',
-    error: state.status === 'error' ? state.message : null,
-    data: state.status === 'success' ? state.data : null,
-    reload: load,
-  };
+  return { loading, error, data, reload: load };
 }
