@@ -76,6 +76,14 @@ export type PendingModNote = {
   username: string;
 };
 
+export type PendingRemoval = {
+  userId: string;
+  username: string;
+  contentId: string;
+  contentUrl: string;
+  contentType: 'post' | 'comment';
+};
+
 const PENDING_WARN_TTL_SECONDS = 900;
 
 const strikeKey = (subredditId: string, userId: string) =>
@@ -91,6 +99,9 @@ const pendingResetKey = (subredditId: string, modUserId: string) =>
 
 const pendingModNoteKey = (subredditId: string, modUserId: string) =>
   `modnote-pending:${subredditId}:${modUserId}`;
+
+const pendingRemovalKey = (subredditId: string, modUserId: string) =>
+  `removal-pending:${subredditId}:${modUserId}`;
 
 const modNotesKey = (subredditId: string, userId: string) =>
   `mod-notes:${subredditId}:${userId}`;
@@ -182,6 +193,27 @@ export async function popPendingReset(
   if (!raw) return null;
   await redis.del(key);
   return JSON.parse(raw) as PendingReset;
+}
+
+export async function savePendingRemoval(
+  subredditId: string,
+  modUserId: string,
+  data: PendingRemoval
+): Promise<void> {
+  const key = pendingRemovalKey(subredditId, modUserId);
+  await redis.set(key, JSON.stringify(data));
+  await redis.expire(key, PENDING_WARN_TTL_SECONDS);
+}
+
+export async function popPendingRemoval(
+  subredditId: string,
+  modUserId: string
+): Promise<PendingRemoval | null> {
+  const key = pendingRemovalKey(subredditId, modUserId);
+  const raw = await redis.get(key);
+  if (!raw) return null;
+  await redis.del(key);
+  return JSON.parse(raw) as PendingRemoval;
 }
 
 export async function savePendingModNote(

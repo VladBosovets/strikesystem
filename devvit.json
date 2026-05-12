@@ -62,6 +62,20 @@
         "location": "post",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/add-mod-note"
+      },
+      {
+        "label": "Remove & Log",
+        "description": "Remove this comment and log it against the author's record.",
+        "location": "comment",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/remove-and-log"
+      },
+      {
+        "label": "Remove & Log",
+        "description": "Remove this post and log it against the author's record.",
+        "location": "post",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/remove-and-log"
       }
     ]
   },
@@ -69,7 +83,8 @@
     "warnUser": "/internal/form/warn-user-submit",
     "viewStrikes": "/internal/form/view-strikes-close",
     "resetStrikes": "/internal/form/reset-strikes-submit",
-    "addModNote": "/internal/form/add-mod-note-submit"
+    "addModNote": "/internal/form/add-mod-note-submit",
+    "removeAndLog": "/internal/form/remove-and-log-submit"
   },
   "triggers": {
     "onAppInstall": "/internal/triggers/on-app-install",

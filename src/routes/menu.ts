@@ -3,7 +3,7 @@ import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 import type { FormField } from '@devvit/shared-types/shared/form.js';
 import { reddit, context, settings } from '@devvit/web/server';
 import { getStrikes, buildAccountIntelDisplay, buildStrikeHistoryDisplay } from '../core/strikes';
-import { DEFAULT_CONFIG, savePendingWarn, getModNotes, savePendingReset, savePendingModNote } from '../core/redis';
+import { DEFAULT_CONFIG, savePendingWarn, getModNotes, savePendingReset, savePendingModNote, savePendingRemoval } from '../core/redis';
 
 export const menu = new Hono();
 
@@ -436,6 +436,104 @@ menu.post('/add-mod-note', async (c) => {
     );
   } catch (err) {
     console.error('add-mod-note menu error:', err);
+    return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
+  }
+});
+
+menu.post('/remove-and-log', async (c) => {
+  try {
+    const request = await c.req.json<MenuItemRequest>();
+    const targetId = request.targetId;
+
+    const user = await reddit.getCurrentUser();
+    if (!user) {
+      return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
+    }
+
+    const modPermissions = await user.getModPermissionsForSubreddit(context.subredditName);
+    const canMod = modPermissions.includes('all') || modPermissions.includes('posts');
+    if (!canMod) {
+      return c.json<UiResponse>({ showToast: 'You do not have mod permissions.' }, 200);
+    }
+
+    let targetUser: { id: string; username: string } | null = null;
+    let contentUrl = '';
+    let contentType: 'post' | 'comment' = 'post';
+
+    if (targetId.startsWith('t1_')) {
+      const comment = await reddit.getCommentById(targetId as `t1_${string}`);
+      if (!comment.authorId) {
+        return c.json<UiResponse>({ showToast: 'Could not find the comment author.' }, 200);
+      }
+      const author = await reddit.getUserById(comment.authorId);
+      targetUser = { id: comment.authorId, username: author?.username ?? '' };
+      contentUrl = `https://reddit.com${comment.permalink}`;
+      contentType = 'comment';
+    } else if (targetId.startsWith('t3_')) {
+      const post = await reddit.getPostById(targetId as `t3_${string}`);
+      if (!post.authorId) {
+        return c.json<UiResponse>({ showToast: 'Could not find the post author.' }, 200);
+      }
+      const author = await reddit.getUserById(post.authorId);
+      targetUser = { id: post.authorId, username: author?.username ?? '' };
+      contentUrl = `https://reddit.com${post.permalink}`;
+      contentType = 'post';
+    }
+
+    if (!targetUser?.username) {
+      return c.json<UiResponse>({ showToast: 'Could not find the author.' }, 200);
+    }
+
+    const modUserId = context.userId;
+    if (!modUserId) {
+      return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
+    }
+
+    await savePendingRemoval(context.subredditId, modUserId, {
+      userId: targetUser.id,
+      username: targetUser.username,
+      contentId: targetId,
+      contentUrl,
+      contentType,
+    });
+
+    const rulesRaw = (await settings.get<string>('rules')) ?? DEFAULT_CONFIG.rules.join('\n');
+    const rules = rulesRaw.split('\n').filter(Boolean);
+    const ruleOptions = rules.map((r) => ({ label: r, value: r }));
+
+    const fields: FormField[] = [
+      {
+        name: 'rule',
+        label: 'Rule violated',
+        type: 'select',
+        options: ruleOptions,
+        required: true,
+      },
+      {
+        name: 'note',
+        label: 'Moderator note (optional)',
+        type: 'paragraph',
+        required: false,
+        defaultValue: '',
+      },
+    ];
+
+    return c.json<UiResponse>(
+      {
+        showForm: {
+          name: 'removeAndLog',
+          form: {
+            title: `Remove & Log — u/${targetUser.username}'s ${contentType}`,
+            fields,
+            acceptLabel: 'Remove & Log',
+            cancelLabel: 'Cancel',
+          },
+        },
+      },
+      200
+    );
+  } catch (err) {
+    console.error('remove-and-log menu error:', err);
     return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
   }
 });

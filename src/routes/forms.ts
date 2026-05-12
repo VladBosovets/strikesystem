@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import type { UiResponse } from '@devvit/web/shared';
 import { reddit, context } from '@devvit/web/server';
 import { addStrike, checkAndBan, buildWarningDM, resetStrikes } from '../core/strikes';
-import { popPendingWarn, popPendingReset, popPendingModNote, getModNotes, saveModNotes } from '../core/redis';
-import type { ModNote } from '../core/redis';
+import { popPendingWarn, popPendingReset, popPendingModNote, getModNotes, saveModNotes, popPendingRemoval, getStrikeRecord, saveStrikeRecord } from '../core/redis';
+import type { ModNote, RemovalEntry } from '../core/redis';
 
 type WarnUserFormValues = {
   history?: string;
@@ -174,6 +174,70 @@ forms.post('/add-mod-note-submit', async (c) => {
     );
   } catch (err) {
     console.error('add-mod-note-submit error:', err);
+    return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
+  }
+});
+
+forms.post('/remove-and-log-submit', async (c) => {
+  try {
+    const values = await c.req.json<{ rule?: string | string[]; note?: string }>();
+
+    const modUserId = context.userId;
+    if (!modUserId) {
+      return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
+    }
+
+    const pending = await popPendingRemoval(context.subredditId, modUserId);
+    if (!pending) {
+      return c.json<UiResponse>({ showToast: 'Session expired. Please try again.' }, 200);
+    }
+
+    const ruleRaw = values.rule;
+    const ruleViolated = Array.isArray(ruleRaw)
+      ? (ruleRaw[0] ?? '').trim()
+      : (ruleRaw ?? '').trim();
+
+    if (!ruleViolated) {
+      return c.json<UiResponse>({ showToast: 'Please select a rule.' }, 200);
+    }
+
+    const note = values.note?.trim() ?? '';
+    const removedBy = context.username ?? 'moderator';
+
+    await reddit.remove(pending.contentId as `t1_${string}` | `t3_${string}`, false);
+
+    const existing = await getStrikeRecord(context.subredditId, pending.userId);
+    const record = existing ?? {
+      userId: pending.userId,
+      username: pending.username,
+      strikes: [],
+      resets: [],
+      removals: [],
+      totalStrikes: 0,
+      activeStrikes: 0,
+      isBanned: false,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    const removal: RemovalEntry = {
+      contentId: pending.contentId,
+      contentUrl: pending.contentUrl,
+      ruleViolated,
+      note,
+      removedBy,
+      removedAt: new Date().toISOString(),
+    };
+
+    record.removals = [...(record.removals ?? []), removal];
+    record.lastUpdated = new Date().toISOString();
+    await saveStrikeRecord(context.subredditId, pending.userId, record);
+
+    return c.json<UiResponse>(
+      { showToast: `${pending.contentType === 'comment' ? 'Comment' : 'Post'} removed and logged for u/${pending.username}.` },
+      200
+    );
+  } catch (err) {
+    console.error('remove-and-log-submit error:', err);
     return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
   }
 });
