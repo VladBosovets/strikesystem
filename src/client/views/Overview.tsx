@@ -1,9 +1,9 @@
 import type { DashboardUser, DashboardUsersResponse } from '../types/api';
+import { UserRow } from '../components/UserRow';
+import { SkeletonList } from '../components/SkeletonList';
+import { ErrorMessage } from '../components/ErrorMessage';
 import '../styles/overview.css';
 import '../styles/components.css';
-import { UserRow } from '../components/UserRow';
-import { LoadingSpinner } from '../components/LoadingSpinner';
-import { ErrorMessage } from '../components/ErrorMessage';
 
 export interface OverviewProps {
   loading: boolean;
@@ -14,7 +14,7 @@ export interface OverviewProps {
 }
 
 export function Overview({ loading, error, data, onSelectUser, onRetry }: OverviewProps) {
-  if (loading) return <LoadingSpinner />;
+  if (loading && !data) return <SkeletonList />;
   if (error) return <ErrorMessage message={error} onRetry={onRetry} />;
   if (!data) return null;
 
@@ -28,6 +28,7 @@ export function Overview({ loading, error, data, onSelectUser, onRetry }: Overvi
         <h1 className="overview-header__title">Mod Dashboard</h1>
         <p className="overview-header__stats">
           {activeCount} active warning{activeCount !== 1 ? 's' : ''} · {bannedCount} banned
+          {loading && <span className="overview-header__refreshing"> · refreshing…</span>}
         </p>
       </header>
 

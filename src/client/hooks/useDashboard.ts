@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { DashboardUsersResponse } from '../types/api';
+
+const REFRESH_INTERVAL_MS = 30_000;
 
 type State =
   | { status: 'loading' }
@@ -9,7 +11,7 @@ type State =
 export function useDashboard() {
   const [state, setState] = useState<State>({ status: 'loading' });
 
-  async function load() {
+  const load = useCallback(async () => {
     setState({ status: 'loading' });
     try {
       const res = await fetch('/api/dashboard/users');
@@ -19,11 +21,13 @@ export function useDashboard() {
     } catch (err) {
       setState({ status: 'error', message: err instanceof Error ? err.message : 'Unknown error' });
     }
-  }
+  }, []);
 
   useEffect(() => {
     void load();
-  }, []);
+    const id = setInterval(() => { void load(); }, REFRESH_INTERVAL_MS);
+    return () => { clearInterval(id); };
+  }, [load]);
 
   return {
     loading: state.status === 'loading',

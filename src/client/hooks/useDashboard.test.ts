@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { useDashboard } from './useDashboard';
 import type { DashboardUsersResponse } from '../types/api';
 
@@ -10,11 +10,11 @@ const mockResponse: DashboardUsersResponse = {
   maxStrikes: 3,
 };
 
-beforeEach(() => {
-  vi.restoreAllMocks();
-});
+// ─── basic state tests (real timers) ─────────────────────────────────────────
 
-describe('useDashboard', () => {
+describe('useDashboard — state', () => {
+  beforeEach(() => { vi.restoreAllMocks(); });
+
   it('returns loading true initially', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify(mockResponse), { status: 200 })
@@ -54,11 +54,45 @@ describe('useDashboard', () => {
 
   it('returns error state on non-ok HTTP response', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('Internal server error', { status: 500 })
+      new Response('error', { status: 500 })
     );
     const { result } = renderHook(() => useDashboard());
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toContain('500');
     expect(result.current.data).toBeNull();
+  });
+});
+
+// ─── timer tests (fake setInterval only) ─────────────────────────────────────
+
+describe('useDashboard — auto-refresh', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  });
+
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('auto-refetches after 30 seconds', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(mockResponse), { status: 200 })
+    );
+    renderHook(() => useDashboard());
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+
+    await act(async () => { vi.advanceTimersByTime(30_000); });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+  });
+
+  it('clears the interval on unmount — no further fetches', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(mockResponse), { status: 200 })
+    );
+    const { unmount } = renderHook(() => useDashboard());
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+
+    unmount();
+    await act(async () => { vi.advanceTimersByTime(90_000); });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });

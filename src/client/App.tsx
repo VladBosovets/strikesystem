@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { DashboardUser } from './types/api';
 import { Overview } from './views/Overview';
 import { UserDetail } from './views/UserDetail';
@@ -9,9 +9,21 @@ type View =
   | { name: 'overview' }
   | { name: 'user-detail'; userId: string; username: string };
 
+// window.devvit is injected by the Devvit CDN in production
+declare global {
+  interface Window {
+    devvit?: { context?: { subredditName?: string } };
+  }
+}
+
 export function App() {
   const [view, setView] = useState<View>({ name: 'overview' });
   const { loading, error, data, reload } = useDashboard();
+
+  useEffect(() => {
+    const sub = window.devvit?.context?.subredditName;
+    if (sub) document.title = `Mod Dashboard — r/${sub}`;
+  }, []);
 
   function handleSelectUser(user: DashboardUser) {
     setView({ name: 'user-detail', userId: user.userId, username: user.username });

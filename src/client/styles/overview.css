@@ -27,3 +27,8 @@
   text-align: center;
   padding: 40px 0;
 }
+
+.overview-header__refreshing {
+  color: var(--color-text-muted);
+  font-style: italic;
+}

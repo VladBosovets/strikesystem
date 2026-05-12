@@ -169,6 +169,21 @@ describe('GET /dashboard/users', () => {
     expect(body.users).toHaveLength(1);
     expect(body.users[0]?.userId).toBe('t2_user1');
   });
+
+  it('stale index entry (userId in index but record deleted) does not crash and is omitted', async () => {
+    mockZRange.mockResolvedValue([
+      { member: 't2_stale', score: 1000 },
+      { member: 't2_user1', score: 500 },
+    ]);
+    // t2_stale was deleted from redis but still in the sorted set index
+    seedUser('t2_user1', 'bob', 1);
+
+    const res = await get('/dashboard/users');
+    expect(res.status).toBe(200);
+    const body = await res.json() as { users: { userId: string }[] };
+    expect(body.users).toHaveLength(1);
+    expect(body.users[0]?.userId).toBe('t2_user1');
+  });
 });
 
 // ─── GET /dashboard/user/:userId ──────────────────────────────────────────────
