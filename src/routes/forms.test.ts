@@ -250,6 +250,30 @@ describe('/reset-strikes-submit', () => {
     expect(record.strikes).toHaveLength(2);
   });
 
+  it('auto-writes a mod note recording the reset', async () => {
+    seedStrikeRecord(2);
+    seedPendingReset();
+    await post('/reset-strikes-submit', { reason: 'appeal approved' });
+    const notes = JSON.parse(store.get(keys.modNotes())!);
+    expect(notes).toHaveLength(1);
+    expect(notes[0].text).toContain('Strikes reset');
+    expect(notes[0].text).toContain('appeal approved');
+    expect(notes[0].author).toBe('testmod');
+  });
+
+  it('appends auto note to existing mod notes', async () => {
+    store.set(keys.modNotes(), JSON.stringify([
+      { id: 'prior', text: 'ban evader', author: 'mod1', createdAt: '2026-01-01T00:00:00.000Z' },
+    ]));
+    seedStrikeRecord(1);
+    seedPendingReset();
+    await post('/reset-strikes-submit', { reason: 'pardoned' });
+    const notes = JSON.parse(store.get(keys.modNotes())!);
+    expect(notes).toHaveLength(2);
+    expect(notes[0].text).toBe('ban evader');
+    expect(notes[1].text).toContain('Strikes reset');
+  });
+
   it('pops the session so a second submit is rejected', async () => {
     seedStrikeRecord(1);
     seedPendingReset();

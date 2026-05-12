@@ -130,6 +130,15 @@ forms.post('/reset-strikes-submit', async (c) => {
       );
     }
 
+    const existingNotes = await getModNotes(context.subredditId, pending.userId);
+    const autoNote: ModNote = {
+      id: `reset-${Date.now()}`,
+      text: `⚠️ Strikes reset (${strikesCleared} cleared) — Reason: ${reason}`,
+      author: resetBy,
+      createdAt: new Date().toISOString(),
+    };
+    await saveModNotes(context.subredditId, pending.userId, [...existingNotes, autoNote]);
+
     return c.json<UiResponse>(
       { showToast: `Warnings reset for u/${pending.username}. ${strikesCleared} active warning(s) cleared.` },
       200
