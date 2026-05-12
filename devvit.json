@@ -11,7 +11,7 @@
       "default": {
         "entry": "index.html",
         "height": "tall",
-        "inline": false
+        "inline": true
       }
     }
   },
