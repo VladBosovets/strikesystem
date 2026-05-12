@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── mocks ────────────────────────────────────────────────────────────────────
 
-const { store, mockUser, mockContext } = vi.hoisted(() => {
+const { store, mockUser, mockContext, mockZRange } = vi.hoisted(() => {
   const mockUser = {
     getModPermissionsForSubreddit: vi.fn(async () => ['all']),
   };
+  const mockZRange = vi.fn(async () => [] as { member: string; score: number }[]);
   return {
     store: new Map<string, string>(),
     mockUser,
@@ -15,6 +16,7 @@ const { store, mockUser, mockContext } = vi.hoisted(() => {
       subredditId: 't5_sub123',
       subredditName: 'testsubreddit',
     },
+    mockZRange,
   };
 });
 
@@ -24,6 +26,8 @@ vi.mock('@devvit/web/server', () => ({
     set: vi.fn(async (key: string, value: string) => { store.set(key, value); }),
     expire: vi.fn(async () => {}),
     del: vi.fn(async (key: string) => { store.delete(key); }),
+    zAdd: vi.fn(async () => 0),
+    zRange: mockZRange,
   },
   reddit: {
     getCurrentUser: vi.fn(async () => mockUser),
@@ -99,6 +103,7 @@ function seedStrikeRecord(activeStrikes: number, totalStrikes = activeStrikes, i
 beforeEach(() => {
   store.clear();
   mockUser.getModPermissionsForSubreddit.mockResolvedValue(['all']);
+  mockZRange.mockResolvedValue([]);
   mockContext.userId = 't2_mod123';
 });
 
@@ -158,5 +163,84 @@ describe('/warn-user (post)', () => {
   it('works for comment targets (t1_) as well as posts', async () => {
     const res = await postMenu('/warn-user', 't1_abc');
     expect(res.showForm?.form.title).toContain('Warning 1/3');
+  });
+});
+
+// ─── /view-all-warnings ───────────────────────────────────────────────────────
+
+function seedStrikeForUser(userId: string, username: string, activeStrikes: number, isBanned = false) {
+  store.set(`strikes:${SUB}:${userId}`, JSON.stringify({
+    userId, username,
+    strikes: Array.from({ length: activeStrikes }, (_, i) => ({
+      strikeNumber: i + 1, ruleViolated: 'Rule 1', note: '', issuedBy: 'mod',
+      issuedAt: '2026-01-01T00:00:00.000Z', postUrl: '',
+    })),
+    resets: [], removals: [],
+    totalStrikes: activeStrikes, activeStrikes, isBanned,
+    lastUpdated: '2026-01-01T00:00:00.000Z',
+  }));
+}
+
+describe('/view-all-warnings', () => {
+  async function getWarnings() {
+    const res = await menu.request('/view-all-warnings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    return res.json() as Promise<{
+      showToast?: string;
+      showForm?: { form: { title: string; fields: { name: string; defaultValue?: string }[] } };
+    }>;
+  }
+
+  it('returns toast when no users have been warned', async () => {
+    const res = await getWarnings();
+    expect(res.showToast).toBe('No warned users on record.');
+  });
+
+  it('returns no-permission toast when mod lacks permissions', async () => {
+    mockUser.getModPermissionsForSubreddit.mockResolvedValue(['wiki']);
+    const res = await getWarnings();
+    expect(res.showToast).toContain('do not have mod permissions');
+  });
+
+  it('shows active warned users in the display', async () => {
+    mockZRange.mockResolvedValue([{ member: 't2_user1', score: 1 }]);
+    seedStrikeForUser('t2_user1', 'warneduser', 2);
+    const res = await getWarnings();
+    const field = res.showForm?.form.fields[0];
+    expect(field?.defaultValue).toContain('warneduser');
+    expect(field?.defaultValue).toContain('2/3');
+  });
+
+  it('shows banned users separately', async () => {
+    mockZRange.mockResolvedValue([{ member: 't2_user1', score: 1 }]);
+    seedStrikeForUser('t2_user1', 'banneduser', 3, true);
+    const res = await getWarnings();
+    const field = res.showForm?.form.fields[0];
+    expect(field?.defaultValue).toContain('BANNED');
+    expect(field?.defaultValue).toContain('banneduser');
+  });
+
+  it('shows cleared users in a separate section', async () => {
+    mockZRange.mockResolvedValue([{ member: 't2_user1', score: 1 }]);
+    seedStrikeForUser('t2_user1', 'cleareduser', 0);
+    const res = await getWarnings();
+    const field = res.showForm?.form.fields[0];
+    expect(field?.defaultValue).toContain('cleareduser');
+    expect(field?.defaultValue).toContain('Cleared');
+  });
+
+  it('summary label shows total active count', async () => {
+    mockZRange.mockResolvedValue([
+      { member: 't2_user1', score: 2 },
+      { member: 't2_user2', score: 1 },
+    ]);
+    seedStrikeForUser('t2_user1', 'user1', 1);
+    seedStrikeForUser('t2_user2', 'user2', 2);
+    const res = await getWarnings();
+    expect(res.showForm?.form.fields[0].name).toBe('summary');
+    expect(res.showForm?.form.title).toContain('testsubreddit');
   });
 });

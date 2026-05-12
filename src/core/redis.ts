@@ -89,6 +89,9 @@ const PENDING_WARN_TTL_SECONDS = 900;
 const strikeKey = (subredditId: string, userId: string) =>
   `strikes:${subredditId}:${userId}`;
 
+const warnedIndexKey = (subredditId: string) =>
+  `warned-index:${subredditId}`;
+
 const configKey = (subredditId: string) => `config:${subredditId}`;
 
 const pendingWarnKey = (subredditId: string, modUserId: string) =>
@@ -131,7 +134,10 @@ export async function saveStrikeRecord(
   userId: string,
   record: StrikeRecord
 ): Promise<void> {
-  await redis.set(strikeKey(subredditId, userId), JSON.stringify(record));
+  await Promise.all([
+    redis.set(strikeKey(subredditId, userId), JSON.stringify(record)),
+    redis.zAdd(warnedIndexKey(subredditId), { score: Date.now(), member: userId }),
+  ]);
 }
 
 export async function getConfig(subredditId: string): Promise<Config> {
@@ -193,6 +199,11 @@ export async function popPendingReset(
   if (!raw) return null;
   await redis.del(key);
   return JSON.parse(raw) as PendingReset;
+}
+
+export async function getWarnedUserIds(subredditId: string): Promise<string[]> {
+  const results = await redis.zRange(warnedIndexKey(subredditId), 0, -1, { by: 'rank', reverse: true });
+  return results.map((r) => r.member);
 }
 
 export async function savePendingRemoval(

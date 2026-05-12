@@ -3,7 +3,7 @@ import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 import type { FormField } from '@devvit/shared-types/shared/form.js';
 import { reddit, context, settings } from '@devvit/web/server';
 import { getStrikes, buildAccountIntelDisplay, buildStrikeHistoryDisplay } from '../core/strikes';
-import { DEFAULT_CONFIG, savePendingWarn, getModNotes, savePendingReset, savePendingModNote, savePendingRemoval } from '../core/redis';
+import { DEFAULT_CONFIG, savePendingWarn, getModNotes, savePendingReset, savePendingModNote, savePendingRemoval, getWarnedUserIds, getStrikeRecord } from '../core/redis';
 
 export const menu = new Hono();
 
@@ -530,6 +530,85 @@ menu.post('/remove-and-log', async (c) => {
     );
   } catch (err) {
     console.error('remove-and-log menu error:', err);
+    return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
+  }
+});
+
+menu.post('/view-all-warnings', async (c) => {
+  try {
+    const user = await reddit.getCurrentUser();
+    if (!user) {
+      return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
+    }
+
+    const modPermissions = await user.getModPermissionsForSubreddit(context.subredditName);
+    const canMod = modPermissions.includes('all') || modPermissions.includes('posts');
+    if (!canMod) {
+      return c.json<UiResponse>({ showToast: 'You do not have mod permissions.' }, 200);
+    }
+
+    const [userIds, maxStrikes] = await Promise.all([
+      getWarnedUserIds(context.subredditId),
+      settings.get<number>('maxStrikes').then((v) => v ?? DEFAULT_CONFIG.maxStrikesBeforeBan),
+    ]);
+
+    if (userIds.length === 0) {
+      return c.json<UiResponse>({ showToast: 'No warned users on record.' }, 200);
+    }
+
+    const records = await Promise.all(
+      userIds.map((id) => getStrikeRecord(context.subredditId, id))
+    );
+
+    const active = records.filter((r) => r && r.activeStrikes > 0) as NonNullable<typeof records[number]>[];
+    const banned = records.filter((r) => r?.isBanned) as NonNullable<typeof records[number]>[];
+    const cleared = records.filter((r) => r && !r.isBanned && r.activeStrikes === 0) as NonNullable<typeof records[number]>[];
+
+    const fmt = (r: NonNullable<typeof records[number]>) => {
+      if (r.isBanned) return `⛔ u/${r.username} — BANNED (${r.totalStrikes} total)`;
+      const bar = '█'.repeat(r.activeStrikes) + '░'.repeat(Math.max(0, maxStrikes - r.activeStrikes));
+      return `⚠️ u/${r.username} — ${r.activeStrikes}/${maxStrikes}  ${bar}`;
+    };
+
+    const sections: string[] = [];
+
+    if (active.length > 0) {
+      sections.push(`Active warnings (${active.length}):\n${active.map(fmt).join('\n')}`);
+    }
+    if (banned.length > 0) {
+      sections.push(`Banned (${banned.length}):\n${banned.map(fmt).join('\n')}`);
+    }
+    if (cleared.length > 0) {
+      sections.push(`Cleared / no active warnings (${cleared.length}):\n${cleared.map((r) => `✓ u/${r.username} — ${r.totalStrikes} all-time`).join('\n')}`);
+    }
+
+    const displayText = sections.join('\n\n');
+    const totalActive = active.length + banned.length;
+
+    return c.json<UiResponse>(
+      {
+        showForm: {
+          name: 'viewStrikes',
+          form: {
+            title: `Warnings — r/${context.subredditName}`,
+            fields: [
+              {
+                name: 'summary',
+                label: `${totalActive} user(s) with active warnings`,
+                type: 'paragraph',
+                defaultValue: displayText,
+                lineHeight: Math.min(3 + userIds.length * 2, 20),
+              },
+            ],
+            acceptLabel: 'Done',
+            cancelLabel: 'Close',
+          },
+        },
+      },
+      200
+    );
+  } catch (err) {
+    console.error('view-all-warnings menu error:', err);
     return c.json<UiResponse>({ showToast: 'Something went wrong. Try again.' }, 200);
   }
 });

@@ -76,6 +76,13 @@
         "location": "post",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/remove-and-log"
+      },
+      {
+        "label": "View All Warnings",
+        "description": "See all users with active warnings in this subreddit.",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/view-all-warnings"
       }
     ]
   },

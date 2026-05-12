@@ -11,6 +11,8 @@ vi.mock('@devvit/web/server', () => ({
     get: vi.fn(async (key: string) => store.get(key)),
     set: vi.fn(async (key: string, value: string) => { store.set(key, value); }),
     del: vi.fn(async (...keys: string[]) => { keys.forEach((k) => store.delete(k)); }),
+    zAdd: vi.fn(async () => 0),
+    zRange: vi.fn(async () => []),
   },
   settings: {
     get: vi.fn(async (key: string) => {

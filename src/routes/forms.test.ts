@@ -21,6 +21,8 @@ vi.mock('@devvit/web/server', () => ({
     set: vi.fn(async (key: string, value: string) => { store.set(key, value); }),
     expire: vi.fn(async () => {}),
     del: vi.fn(async (key: string) => { store.delete(key); }),
+    zAdd: vi.fn(async () => 0),
+    zRange: vi.fn(async () => []),
   },
   reddit: mockReddit,
   context: mockContext,
