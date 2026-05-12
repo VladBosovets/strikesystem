@@ -192,9 +192,9 @@ describe('/warn-user-submit', () => {
 // ─── /view-strikes-close ──────────────────────────────────────────────────────
 
 describe('/view-strikes-close', () => {
-  it('returns empty toast', async () => {
+  it('returns 200 with no toast so closing the form is silent', async () => {
     const res = await post('/view-strikes-close', {});
-    expect(res.showToast).toBe('');
+    expect(res.showToast).toBeUndefined();
   });
 });
 
