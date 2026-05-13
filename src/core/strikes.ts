@@ -232,7 +232,7 @@ export function buildStrikeHistoryDisplay(
   record: StrikeRecord | null,
   maxStrikes: number
 ): string {
-  if (!record || record.strikes.length === 0) return 'No warnings on record.';
+  if (!record || record.strikes.length === 0) return 'No strikes on record.';
 
   const lines: string[] = [];
 

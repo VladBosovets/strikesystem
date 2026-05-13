@@ -108,7 +108,7 @@ menu.post('/warn-user', async (c) => {
       },
       {
         name: 'history',
-        label: 'Warning history',
+        label: 'Strike history',
         type: 'paragraph',
         defaultValue: historyText,
         lineHeight: 5,
@@ -219,7 +219,7 @@ menu.post('/view-strikes', async (c) => {
       },
       {
         name: 'strikeHistory',
-        label: 'Warning history',
+        label: 'Strike history',
         type: 'paragraph',
         defaultValue: strikeHistory,
         lineHeight: 8,
@@ -305,7 +305,7 @@ menu.post('/reset-strikes', async (c) => {
 
     if (!existing || existing.activeStrikes === 0) {
       return c.json<UiResponse>(
-        { showToast: `u/${targetUser.username} has no active warnings to reset.` },
+        { showToast: `u/${targetUser.username} has no active strikes to reset.` },
         200
       );
     }
@@ -585,7 +585,7 @@ menu.post('/view-all-warnings', async (c) => {
     ]);
 
     if (userIds.length === 0) {
-      return c.json<UiResponse>({ showToast: 'No warned users on record.' }, 200);
+      return c.json<UiResponse>({ showToast: 'No users with strikes on record.' }, 200);
     }
 
     const records = await Promise.all(
@@ -605,13 +605,13 @@ menu.post('/view-all-warnings', async (c) => {
     const sections: string[] = [];
 
     if (active.length > 0) {
-      sections.push(`Active warnings (${active.length}):\n${active.map(fmt).join('\n')}`);
+      sections.push(`Active strikes (${active.length}):\n${active.map(fmt).join('\n')}`);
     }
     if (banned.length > 0) {
       sections.push(`Banned (${banned.length}):\n${banned.map(fmt).join('\n')}`);
     }
     if (cleared.length > 0) {
-      sections.push(`Cleared / no active warnings (${cleared.length}):\n${cleared.map((r) => `✓ u/${r.username} — ${r.totalStrikes} all-time`).join('\n')}`);
+      sections.push(`Cleared / no active strikes (${cleared.length}):\n${cleared.map((r) => `✓ u/${r.username} — ${r.totalStrikes} all-time`).join('\n')}`);
     }
 
     const displayText = sections.join('\n\n');

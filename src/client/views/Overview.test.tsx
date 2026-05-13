@@ -66,12 +66,12 @@ describe('Overview — stats header', () => {
       users: [makeUser('alice', 2), makeUser('banned', 0, true)],
       maxStrikes: 3,
     });
-    expect(screen.getByText(/1 active warning/)).toBeDefined();
+    expect(screen.getByText(/1 active strike/)).toBeDefined();
     expect(screen.getByText(/1 banned/)).toBeDefined();
   });
 
   it('shows empty state when no users', () => {
     renderOverview({ users: [], maxStrikes: 3 });
-    expect(screen.getByText('No warned users on record.')).toBeDefined();
+    expect(screen.getByText('No users with strikes on record.')).toBeDefined();
   });
 });
