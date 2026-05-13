@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { DashboardUserDetailResponse } from '../types/api';
 
 type State =
@@ -8,6 +8,9 @@ type State =
 
 export function useUser(userId: string) {
   const [state, setState] = useState<State>({ status: 'loading' });
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const reload = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,11 +32,12 @@ export function useUser(userId: string) {
 
     void load();
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, reloadKey]);
 
   return {
     loading: state.status === 'loading',
     error: state.status === 'error' ? state.message : null,
     data: state.status === 'success' ? state.data : null,
+    reload,
   };
 }

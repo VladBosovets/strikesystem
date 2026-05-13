@@ -67,4 +67,20 @@ describe('useUser', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBe('Network error');
   });
+
+  it('reload() triggers a new fetch without changing userId', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValueOnce(new Response(JSON.stringify(mockDetail), { status: 200 }));
+
+    const { result } = renderHook(() => useUser('t2_u1'));
+    await waitFor(() => expect(result.current.error).toBe('Network error'));
+
+    result.current.reload();
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.data?.user.username).toBe('alice');
+    expect(result.current.error).toBeNull();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
 });
