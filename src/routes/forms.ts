@@ -74,7 +74,7 @@ forms.post('/warn-user-submit', async (c) => {
     if (wasBanned) {
       return c.json<UiResponse>(
         {
-          showToast: `u/${username} has been warned and auto-banned after reaching ${newTotal}/${config.maxStrikesBeforeBan} warnings.`,
+          showToast: `u/${username} has been struck and auto-banned after reaching ${newTotal}/${config.maxStrikesBeforeBan} strikes.`,
         },
         200
       );
@@ -82,7 +82,7 @@ forms.post('/warn-user-submit', async (c) => {
 
     return c.json<UiResponse>(
       {
-        showToast: `Warning ${newTotal}/${config.maxStrikesBeforeBan} issued to u/${username}.`,
+        showToast: `Strike ${newTotal}/${config.maxStrikesBeforeBan} issued to u/${username}.`,
       },
       200
     );
@@ -140,7 +140,7 @@ forms.post('/reset-strikes-submit', async (c) => {
     await saveModNotes(context.subredditId, pending.userId, [...existingNotes, autoNote]);
 
     return c.json<UiResponse>(
-      { showToast: `Warnings reset for u/${pending.username}. ${strikesCleared} active warning(s) cleared.` },
+      { showToast: `Strikes reset for u/${pending.username}. ${strikesCleared} active strike(s) cleared.` },
       200
     );
   } catch (err) {

@@ -122,9 +122,9 @@ beforeEach(() => {
 // ─── /warn-user ───────────────────────────────────────────────────────────────
 
 describe('/warn-user (post)', () => {
-  it('shows Warning 1/3 for a fresh user with no record', async () => {
+  it('shows Strike 1/3 for a fresh user with no record', async () => {
     const res = await postMenu('/warn-user', 't3_xyz');
-    expect(res.showForm?.form.title).toContain('Warning 1/3');
+    expect(res.showForm?.form.title).toContain('Strike 1/3');
     expect(res.showForm?.form.title).not.toContain('AUTO-BAN');
   });
 
@@ -132,7 +132,7 @@ describe('/warn-user (post)', () => {
     // totalStrikes=2 (all-time) but activeStrikes=0 after reset
     seedStrikeRecord(0, 2);
     const res = await postMenu('/warn-user', 't3_xyz');
-    expect(res.showForm?.form.title).toContain('Warning 1/3');
+    expect(res.showForm?.form.title).toContain('Strike 1/3');
     expect(res.showForm?.form.title).not.toContain('AUTO-BAN');
   });
 
@@ -148,15 +148,15 @@ describe('/warn-user (post)', () => {
     seedStrikeRecord(1, 5);
     const res = await postMenu('/warn-user', 't3_xyz');
     expect(res.showForm?.form.title).not.toContain('AUTO-BAN');
-    expect(res.showForm?.form.title).toContain('Warning 2/3');
+    expect(res.showForm?.form.title).toContain('Strike 2/3');
   });
 
-  it('history field shows active warning count not all-time count', async () => {
+  it('history field shows active strike count not all-time count', async () => {
     seedStrikeRecord(0, 2);
     const res = await postMenu('/warn-user', 't3_xyz');
     const historyField = res.showForm?.form.fields.find((f) => f.name === 'history');
-    expect(historyField?.defaultValue).toContain('No active warnings');
-    expect(historyField?.defaultValue).not.toContain('Current warnings: 2');
+    expect(historyField?.defaultValue).toContain('No active strikes');
+    expect(historyField?.defaultValue).not.toContain('Current strikes: 2');
   });
 
   it('returns already-banned toast when user is banned', async () => {
@@ -174,7 +174,7 @@ describe('/warn-user (post)', () => {
 
   it('works for comment targets (t1_) as well as posts', async () => {
     const res = await postMenu('/warn-user', 't1_abc');
-    expect(res.showForm?.form.title).toContain('Warning 1/3');
+    expect(res.showForm?.form.title).toContain('Strike 1/3');
   });
 });
 
@@ -267,7 +267,7 @@ describe('/view-all-warnings', () => {
     const res = await getWarnings();
     const label = (res.showForm?.form.fields[0] as { label?: string })?.label ?? '';
     // totalActive should be 2 (1 active non-banned + 1 banned), not 3
-    expect(label).toBe('2 user(s) with active warnings');
+    expect(label).toBe('2 user(s) with active strikes');
     const text = res.showForm?.form.fields[0].defaultValue ?? '';
     // banneduser should appear only in Banned section, not in Active warnings
     const activeSection = text.split('\n\n')[0] ?? '';
