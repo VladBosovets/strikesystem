@@ -1,3 +1,4 @@
+import { navigateTo } from '@devvit/client';
 import type { DashboardUserDetail } from '../types/api';
 import { useUser } from '../hooks/useUser';
 import { StrikeBar } from '../components/StrikeBar';
@@ -70,9 +71,9 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 <span className="ud-list__meta">{s.issuedAt.slice(0, 10)} · by u/{s.issuedBy}</span>
                 {s.note && <span className="ud-list__note">{s.note}</span>}
                 {s.postUrl && (
-                  <a href={s.postUrl} target="_blank" rel="noreferrer" className="ud-list__link">
+                  <button className="ud-list__link" onClick={() => navigateTo(s.postUrl)}>
                     View post →
-                  </a>
+                  </button>
                 )}
               </li>
             ))}
@@ -107,9 +108,9 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 <span className="ud-list__meta">{r.removedAt.slice(0, 10)} · by u/{r.removedBy}</span>
                 {r.note && <span className="ud-list__note">{r.note}</span>}
                 {r.contentUrl && (
-                  <a href={r.contentUrl} target="_blank" rel="noreferrer" className="ud-list__link">
+                  <button className="ud-list__link" onClick={() => navigateTo(r.contentUrl)}>
                     View content →
-                  </a>
+                  </button>
                 )}
               </li>
             ))}
