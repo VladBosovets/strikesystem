@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { navigateTo } from '@devvit/client';
-import type { DashboardUserDetail } from '../types/api';
+import type { DashboardUserDetail, StrikeActionResponse, ResetActionResponse } from '../types/api';
 import { useUser } from '../hooks/useUser';
 import { StrikeBar } from '../components/StrikeBar';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -11,6 +12,8 @@ export interface UserDetailProps {
   username: string;
   onBack: () => void;
 }
+
+type ActivePanel = 'strike' | 'reset' | 'note' | null;
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -40,10 +43,159 @@ function UserSummary({ user, maxStrikes }: { user: DashboardUserDetail; maxStrik
   );
 }
 
+function StrikePanel({
+  rules, userId, onSuccess, onCancel,
+}: { rules: string[]; userId: string; onSuccess: (msg: string) => void; onCancel: () => void }) {
+  const [rule, setRule] = useState(rules[0] ?? '');
+  const [note, setNote] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/dashboard/user/${encodeURIComponent(userId)}/strike`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rule, note }),
+      });
+      if (!res.ok) {
+        const body = await res.json() as { error?: string };
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json() as StrikeActionResponse;
+      const banned = data.wasBanned ? ' — user auto-banned.' : '.';
+      const dm = data.dmFailed ? ' (DM not delivered)' : '';
+      onSuccess(`Strike ${data.newTotal}/${data.maxStrikes} issued${banned}${dm}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="ud-panel">
+      <span className="ud-panel__title">Issue Strike</span>
+      <div>
+        <label className="ud-panel__label">Rule violated</label>
+        <select value={rule} onChange={(e) => setRule(e.target.value)}>
+          {rules.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="ud-panel__label">Moderator note (optional)</label>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add context…" />
+      </div>
+      {error && <p className="ud-panel__feedback ud-panel__feedback--error">{error}</p>}
+      <div className="ud-panel__row">
+        <button className="ud-panel__cancel" onClick={onCancel}>Cancel</button>
+        <button className="ud-panel__submit" onClick={submit} disabled={loading || !rule}>
+          {loading ? 'Issuing…' : 'Issue Strike'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ResetPanel({
+  userId, isBanned, onSuccess, onCancel,
+}: { userId: string; isBanned: boolean; onSuccess: (msg: string) => void; onCancel: () => void }) {
+  const [reason, setReason] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/dashboard/user/${encodeURIComponent(userId)}/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) {
+        const body = await res.json() as { error?: string };
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json() as ResetActionResponse;
+      const unban = data.wasUnbanned ? ' User unbanned.' : '';
+      onSuccess(`${data.strikesCleared} strike(s) cleared.${unban}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="ud-panel">
+      <span className="ud-panel__title">{isBanned ? 'Reset Strikes & Unban' : 'Reset Strikes'}</span>
+      <div>
+        <label className="ud-panel__label">Reason for reset</label>
+        <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Appeal approved, served time, etc." />
+      </div>
+      {error && <p className="ud-panel__feedback ud-panel__feedback--error">{error}</p>}
+      <div className="ud-panel__row">
+        <button className="ud-panel__cancel" onClick={onCancel}>Cancel</button>
+        <button className="ud-panel__submit" onClick={submit} disabled={loading || !reason.trim()}>
+          {loading ? 'Resetting…' : isBanned ? 'Reset & Unban' : 'Reset Strikes'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function NotePanel({
+  userId, onSuccess, onCancel,
+}: { userId: string; onSuccess: (msg: string) => void; onCancel: () => void }) {
+  const [note, setNote] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/dashboard/user/${encodeURIComponent(userId)}/note`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note }),
+      });
+      if (!res.ok) {
+        const body = await res.json() as { error?: string };
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      onSuccess('Mod note saved.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="ud-panel">
+      <span className="ud-panel__title">Add Mod Note</span>
+      <div>
+        <label className="ud-panel__label">Note</label>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Internal note visible only to mods…" />
+      </div>
+      {error && <p className="ud-panel__feedback ud-panel__feedback--error">{error}</p>}
+      <div className="ud-panel__row">
+        <button className="ud-panel__cancel" onClick={onCancel}>Cancel</button>
+        <button className="ud-panel__submit" onClick={submit} disabled={loading || !note.trim()}>
+          {loading ? 'Saving…' : 'Save Note'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function UserDetail({ userId, onBack }: UserDetailProps) {
   const { loading, error, data, reload } = useUser(userId);
+  const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
-  if (loading) return <LoadingSpinner />;
+  if (loading && !data) return <LoadingSpinner />;
   if (error) return (
     <div>
       <button className="ud-back" onClick={onBack}>← Back</button>
@@ -52,13 +204,77 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   );
   if (!data) return null;
 
-  const { user, maxStrikes } = data;
+  const { user, maxStrikes, rules } = data;
+
+  function handleActionSuccess(msg: string) {
+    setActivePanel(null);
+    setActionFeedback(msg);
+    reload();
+    setTimeout(() => setActionFeedback(null), 4000);
+  }
+
+  const canReset = user.activeStrikes > 0 || user.isBanned;
 
   return (
     <div className="user-detail">
       <button className="ud-back" onClick={onBack}>← Back</button>
 
       <UserSummary user={user} maxStrikes={maxStrikes} />
+
+      <div className="ud-actions">
+        {!user.isBanned && (
+          <button
+            className={`ud-action-btn${activePanel === 'strike' ? ' ud-action-btn--active' : ''}`}
+            onClick={() => setActivePanel(activePanel === 'strike' ? null : 'strike')}
+          >
+            Issue Strike
+          </button>
+        )}
+        {canReset && (
+          <button
+            className={`ud-action-btn ud-action-btn--danger${activePanel === 'reset' ? ' ud-action-btn--active' : ''}`}
+            onClick={() => setActivePanel(activePanel === 'reset' ? null : 'reset')}
+          >
+            {user.isBanned ? 'Reset & Unban' : 'Reset Strikes'}
+          </button>
+        )}
+        <button
+          className={`ud-action-btn${activePanel === 'note' ? ' ud-action-btn--active' : ''}`}
+          onClick={() => setActivePanel(activePanel === 'note' ? null : 'note')}
+        >
+          Add Mod Note
+        </button>
+      </div>
+
+      {actionFeedback && (
+        <p className="ud-panel__feedback ud-panel__feedback--success" style={{ marginBottom: 12 }}>
+          {actionFeedback}
+        </p>
+      )}
+
+      {activePanel === 'strike' && (
+        <StrikePanel
+          rules={rules}
+          userId={userId}
+          onSuccess={handleActionSuccess}
+          onCancel={() => setActivePanel(null)}
+        />
+      )}
+      {activePanel === 'reset' && (
+        <ResetPanel
+          userId={userId}
+          isBanned={user.isBanned}
+          onSuccess={handleActionSuccess}
+          onCancel={() => setActivePanel(null)}
+        />
+      )}
+      {activePanel === 'note' && (
+        <NotePanel
+          userId={userId}
+          onSuccess={handleActionSuccess}
+          onCancel={() => setActivePanel(null)}
+        />
+      )}
 
       <Section title="Strike history">
         {user.strikes.length === 0 ? (
