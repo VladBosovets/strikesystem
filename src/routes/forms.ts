@@ -69,7 +69,7 @@ forms.post('/warn-user-submit', async (c) => {
       console.error('Failed to send warning DM:', dmErr);
     }
 
-    const wasBanned = await checkAndBan(subredditId, userId, subredditName);
+    const wasBanned = await checkAndBan(subredditId, userId, subredditName, config);
 
     if (wasBanned) {
       return c.json<UiResponse>(

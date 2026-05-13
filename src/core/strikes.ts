@@ -90,9 +90,10 @@ export async function addStrike(
 export async function checkAndBan(
   subredditId: string,
   userId: string,
-  subredditName: string
+  subredditName: string,
+  providedConfig?: Config
 ): Promise<boolean> {
-  const config = await loadConfig();
+  const config = providedConfig ?? await loadConfig();
   const record = await getStrikeRecord(subredditId, userId);
   if (!record || record.isBanned) return false;
   if (record.activeStrikes < config.maxStrikesBeforeBan) return false;
