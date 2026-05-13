@@ -59,6 +59,7 @@ forms.post('/warn-user-submit', async (c) => {
       config.warningMessageTemplate
     );
 
+    let dmFailed = false;
     try {
       await reddit.sendPrivateMessage({
         to: username,
@@ -67,14 +68,16 @@ forms.post('/warn-user-submit', async (c) => {
       });
     } catch (dmErr) {
       console.error('Failed to send warning DM:', dmErr);
+      dmFailed = true;
     }
 
     const wasBanned = await checkAndBan(subredditId, userId, subredditName, config);
+    const dmNote = dmFailed ? ' (DM not delivered — user has messages restricted)' : '';
 
     if (wasBanned) {
       return c.json<UiResponse>(
         {
-          showToast: `u/${username} has been struck and auto-banned after reaching ${newTotal}/${config.maxStrikesBeforeBan} strikes.`,
+          showToast: `u/${username} has been struck and auto-banned after reaching ${newTotal}/${config.maxStrikesBeforeBan} strikes.${dmNote}`,
         },
         200
       );
@@ -82,7 +85,7 @@ forms.post('/warn-user-submit', async (c) => {
 
     return c.json<UiResponse>(
       {
-        showToast: `Strike ${newTotal}/${config.maxStrikesBeforeBan} issued to u/${username}.`,
+        showToast: `Strike ${newTotal}/${config.maxStrikesBeforeBan} issued to u/${username}.${dmNote}`,
       },
       200
     );

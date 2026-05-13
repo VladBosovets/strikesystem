@@ -160,6 +160,20 @@ describe('/warn-user-submit', () => {
     );
   });
 
+  it('appends DM failure note to toast when user has messages restricted', async () => {
+    mockReddit.sendPrivateMessage.mockRejectedValueOnce(new Error('NOT_WHITELISTED_BY_USER_MESSAGE'));
+    seedPendingWarn();
+    const res = await post('/warn-user-submit', { rule: 'Rule 1' });
+    expect(res.showToast).toContain('Strike 1/3');
+    expect(res.showToast).toContain('DM not delivered');
+  });
+
+  it('does not append DM note when DM succeeds', async () => {
+    seedPendingWarn();
+    const res = await post('/warn-user-submit', { rule: 'Rule 1' });
+    expect(res.showToast).not.toContain('DM not delivered');
+  });
+
   it('counts from existing active strikes on second strike', async () => {
     seedStrikeRecord(1);
     seedPendingWarn();
