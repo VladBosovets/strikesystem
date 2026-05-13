@@ -137,24 +137,30 @@ forms.post('/reset-strikes-submit', async (c) => {
       );
     }
 
+    let unbanFailed = false;
     if (wasBanned) {
       try {
         await reddit.unbanUser(pending.username, context.subredditName);
       } catch (err) {
         console.error('Failed to unban user during reset:', err);
+        unbanFailed = true;
       }
     }
 
     const existingNotes = await getModNotes(context.subredditId, pending.userId);
     const autoNote: ModNote = {
       id: `reset-${Date.now()}`,
-      text: `⚠️ Strikes reset (${strikesCleared} cleared)${wasBanned ? ' — user unbanned' : ''} — Reason: ${reason}`,
+      text: `⚠️ Strikes reset (${strikesCleared} cleared)${wasBanned && !unbanFailed ? ' — user unbanned' : wasBanned ? ' — unban failed, manual action required' : ''} — Reason: ${reason}`,
       author: resetBy,
       createdAt: new Date().toISOString(),
     };
     await saveModNotes(context.subredditId, pending.userId, [...existingNotes, autoNote]);
 
-    const unbanNote = wasBanned ? ' User has been unbanned.' : '';
+    const unbanNote = wasBanned
+      ? unbanFailed
+        ? ' ⚠️ Could not unban automatically — please unban manually.'
+        : ' User has been unbanned.'
+      : '';
     return c.json<UiResponse>(
       { showToast: `Strikes reset for u/${pending.username}. ${strikesCleared} active strike(s) cleared.${unbanNote}` },
       200

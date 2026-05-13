@@ -156,7 +156,87 @@ export async function deleteUserData(
   subredditId: string,
   userId: string
 ): Promise<void> {
-  await redis.del(strikeKey(subredditId, userId));
+  await Promise.all([
+    redis.del(strikeKey(subredditId, userId)),
+    redis.del(modNotesKey(subredditId, userId)),
+    redis.zRem(warnedIndexKey(subredditId), [userId]),
+  ]);
+}
+
+export async function clearDeletedPostFromRecords(
+  subredditId: string,
+  postId: string
+): Promise<void> {
+  const shortId = postId.replace(/^t3_/, '');
+  const fullId = `t3_${shortId}`;
+
+  const userIds = await getWarnedUserIds(subredditId);
+  if (userIds.length === 0) return;
+
+  await Promise.all(
+    userIds.map(async (userId) => {
+      const record = await getStrikeRecord(subredditId, userId);
+      if (!record) return;
+
+      let modified = false;
+
+      const strikes = record.strikes.map((s) => {
+        if (s.postUrl && s.postUrl.includes(`/comments/${shortId}`)) {
+          modified = true;
+          return { ...s, postUrl: '' };
+        }
+        return s;
+      });
+
+      const removals = record.removals.map((r) => {
+        if (r.contentId === fullId || r.contentId === shortId) {
+          modified = true;
+          return { ...r, contentId: '', contentUrl: '' };
+        }
+        return r;
+      });
+
+      if (modified) {
+        await saveStrikeRecord(subredditId, userId, {
+          ...record, strikes, removals, lastUpdated: new Date().toISOString(),
+        });
+      }
+    })
+  );
+}
+
+export async function clearDeletedCommentFromRecords(
+  subredditId: string,
+  commentId: string
+): Promise<void> {
+  const shortId = commentId.replace(/^t1_/, '');
+  const fullId = `t1_${shortId}`;
+
+  const userIds = await getWarnedUserIds(subredditId);
+  if (userIds.length === 0) return;
+
+  await Promise.all(
+    userIds.map(async (userId) => {
+      const record = await getStrikeRecord(subredditId, userId);
+      if (!record) return;
+
+      let modified = false;
+
+      const removals = record.removals.map((r) => {
+        if (r.contentId === fullId || r.contentId === shortId) {
+          modified = true;
+          return { ...r, contentId: '', contentUrl: '' };
+        }
+        return r;
+      });
+
+      if (modified) {
+        await saveStrikeRecord(subredditId, userId, {
+          ...record, removals, lastUpdated: new Date().toISOString(),
+        });
+      }
+    })
+  );
 }
 
 export async function savePendingWarn(

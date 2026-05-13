@@ -172,15 +172,18 @@ api.post('/dashboard/user/:userId/reset', async (c) => {
   }
 
   const existing = await getModNotes(context.subredditId, userId);
+  const unbanNote = wasBanned
+    ? wasUnbanned ? ' — user unbanned' : ' — unban failed, manual action required'
+    : '';
   const autoNote: ModNote = {
     id: `reset-${Date.now()}`,
-    text: `⚠️ Strikes reset (${strikesCleared} cleared)${wasUnbanned ? ' — user unbanned' : ''} — Reason: ${reason.trim()}`,
+    text: `⚠️ Strikes reset (${strikesCleared} cleared)${unbanNote} — Reason: ${reason.trim()}`,
     author: resetBy,
     createdAt: new Date().toISOString(),
   };
   await saveModNotes(context.subredditId, userId, [...existing, autoNote]);
 
-  return c.json<ResetActionResponse>({ strikesCleared: strikesCleared ?? 0, wasUnbanned });
+  return c.json<ResetActionResponse>({ strikesCleared: strikesCleared ?? 0, wasUnbanned, unbanFailed: wasBanned && !wasUnbanned });
 });
 
 api.post('/dashboard/user/:userId/note', async (c) => {

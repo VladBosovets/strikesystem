@@ -119,7 +119,11 @@ function ResetPanel({
         throw new Error(body.error ?? `HTTP ${res.status}`);
       }
       const data = await res.json() as ResetActionResponse;
-      const unban = data.wasUnbanned ? ' User unbanned.' : '';
+      const unban = data.wasUnbanned
+        ? ' User unbanned.'
+        : data.unbanFailed
+          ? ' ⚠️ Could not unban automatically — please unban manually.'
+          : '';
       onSuccess(`${data.strikesCleared} strike(s) cleared.${unban}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');

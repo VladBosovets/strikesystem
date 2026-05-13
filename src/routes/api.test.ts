@@ -384,18 +384,29 @@ describe('POST /dashboard/user/:userId/reset', () => {
   it('resets strikes and returns strikesCleared', async () => {
     seedUser('t2_user1', 'alice', 2);
     const res = await post('/dashboard/user/t2_user1/reset', { reason: 'appeal' });
-    const body = await res.json() as { strikesCleared: number; wasUnbanned: boolean };
+    const body = await res.json() as { strikesCleared: number; wasUnbanned: boolean; unbanFailed: boolean };
     expect(res.status).toBe(200);
     expect(body.strikesCleared).toBe(2);
     expect(body.wasUnbanned).toBe(false);
+    expect(body.unbanFailed).toBe(false);
   });
 
   it('calls unbanUser and sets wasUnbanned when user was banned', async () => {
     seedUser('t2_user1', 'alice', 3, true);
     const res = await post('/dashboard/user/t2_user1/reset', { reason: 'appeal' });
-    const body = await res.json() as { wasUnbanned: boolean };
+    const body = await res.json() as { wasUnbanned: boolean; unbanFailed: boolean };
     expect(mockReddit.unbanUser).toHaveBeenCalledWith('alice', 'testsubreddit');
     expect(body.wasUnbanned).toBe(true);
+    expect(body.unbanFailed).toBe(false);
+  });
+
+  it('sets unbanFailed when unbanUser throws', async () => {
+    seedUser('t2_user1', 'alice', 3, true);
+    mockReddit.unbanUser.mockRejectedValueOnce(new Error('API error'));
+    const res = await post('/dashboard/user/t2_user1/reset', { reason: 'appeal' });
+    const body = await res.json() as { wasUnbanned: boolean; unbanFailed: boolean };
+    expect(body.wasUnbanned).toBe(false);
+    expect(body.unbanFailed).toBe(true);
   });
 
   it('returns 400 when reason is missing', async () => {

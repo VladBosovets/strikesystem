@@ -79,6 +79,7 @@ export type StrikeActionResponse = {
 export type ResetActionResponse = {
   strikesCleared: number;
   wasUnbanned: boolean;
+  unbanFailed: boolean;
 };
 
 export type NoteActionResponse = {
