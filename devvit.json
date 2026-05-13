@@ -1,7 +1,6 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
   "name": "strikesystem",
-  "version": "1.0.0",
   "server": {
     "dir": "dist/server",
     "entry": "index.cjs"
