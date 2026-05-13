@@ -62,7 +62,7 @@ forms.post('/warn-user-submit', async (c) => {
     try {
       await reddit.sendPrivateMessage({
         to: username,
-        subject: `Warning from r/${subredditName}`,
+        subject: `Strike from r/${subredditName}`,
         text: dmText,
       });
     } catch (dmErr) {

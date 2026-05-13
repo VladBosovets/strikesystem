@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { useUser } from './useUser';
 import type { DashboardUserDetailResponse } from '../types/api';
 
@@ -76,10 +76,9 @@ describe('useUser', () => {
     const { result } = renderHook(() => useUser('t2_u1'));
     await waitFor(() => expect(result.current.error).toBe('Network error'));
 
-    result.current.reload();
+    act(() => { result.current.reload(); });
 
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.data?.user.username).toBe('alice');
+    await waitFor(() => expect(result.current.data?.user.username).toBe('alice'));
     expect(result.current.error).toBeNull();
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });

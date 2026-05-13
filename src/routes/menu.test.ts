@@ -208,7 +208,7 @@ describe('/view-all-warnings', () => {
 
   it('returns toast when no users have been warned', async () => {
     const res = await getWarnings();
-    expect(res.showToast).toBe('No warned users on record.');
+    expect(res.showToast).toBe('No users with strikes on record.');
   });
 
   it('returns no-permission toast when mod lacks permissions', async () => {

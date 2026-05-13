@@ -87,11 +87,11 @@ function makeRecord(overrides: Partial<StrikeRecord> = {}): StrikeRecord {
 
 describe('buildStrikeHistoryDisplay', () => {
   it('returns no-record message for null', () => {
-    expect(buildStrikeHistoryDisplay(null, 3)).toBe('No warnings on record.');
+    expect(buildStrikeHistoryDisplay(null, 3)).toBe('No strikes on record.');
   });
 
   it('returns no-record message for empty strikes array', () => {
-    expect(buildStrikeHistoryDisplay(makeRecord(), 3)).toBe('No warnings on record.');
+    expect(buildStrikeHistoryDisplay(makeRecord(), 3)).toBe('No strikes on record.');
   });
 
   it('shows active and total counts', () => {

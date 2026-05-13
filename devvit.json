@@ -18,43 +18,43 @@
   "menu": {
     "items": [
       {
-        "label": "Issue Warning",
-        "description": "Issue a strike warning to the author of this comment.",
+        "label": "Issue Strike",
+        "description": "Issue a strike to the author of this comment.",
         "location": "comment",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/warn-user"
       },
       {
-        "label": "Issue Warning",
-        "description": "Issue a strike warning to the author of this post.",
+        "label": "Issue Strike",
+        "description": "Issue a strike to the author of this post.",
         "location": "post",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/warn-user"
       },
       {
         "label": "View Strike History",
-        "description": "View the full warning history for the author of this comment.",
+        "description": "View the full strike history for the author of this comment.",
         "location": "comment",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/view-strikes"
       },
       {
         "label": "View Strike History",
-        "description": "View the full warning history for the author of this post.",
+        "description": "View the full strike history for the author of this post.",
         "location": "post",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/view-strikes"
       },
       {
         "label": "Reset Strikes",
-        "description": "Clear active warnings for the author of this comment.",
+        "description": "Clear active strikes for the author of this comment.",
         "location": "comment",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/reset-strikes"
       },
       {
         "label": "Reset Strikes",
-        "description": "Clear active warnings for the author of this post.",
+        "description": "Clear active strikes for the author of this post.",
         "location": "post",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/reset-strikes"
@@ -88,8 +88,8 @@
         "endpoint": "/internal/menu/remove-and-log"
       },
       {
-        "label": "View All Warnings",
-        "description": "See all users with active warnings in this subreddit.",
+        "label": "View All Strikes",
+        "description": "See all users with active strikes in this subreddit.",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/view-all-warnings"
@@ -118,10 +118,10 @@
   "settings": {
     "global": {
       "maxStrikes": {
-        "label": "Max warnings before ban",
+        "label": "Max strikes before ban",
         "type": "number",
         "defaultValue": 3,
-        "helpText": "Number of warnings before auto-ban triggers. Default: 3."
+        "helpText": "Number of strikes before auto-ban triggers. Default: 3."
       },
       "banDuration": {
         "label": "Ban duration (days)",
@@ -133,10 +133,10 @@
         "label": "Subreddit rules (one per line)",
         "type": "paragraph",
         "defaultValue": "Rule 1\nRule 2\nRule 3",
-        "helpText": "These appear as selectable options when issuing a warning."
+        "helpText": "These appear as selectable options when issuing a strike."
       },
       "warningMessage": {
-        "label": "Custom warning message template",
+        "label": "Custom strike message template",
         "type": "paragraph",
         "defaultValue": "",
         "helpText": "Leave blank to use the default message. Available placeholders: {username}, {subreddit}, {ruleName}, {strikeNumber}, {maxStrikes}."

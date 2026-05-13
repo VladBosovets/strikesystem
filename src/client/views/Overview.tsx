@@ -35,13 +35,13 @@ export function Overview({ loading, error, data, onSelectUser, onRetry }: Overvi
       <header className="overview-header">
         <h1 className="overview-header__title">Mod Dashboard</h1>
         <p className="overview-header__stats">
-          {activeCount} active warning{activeCount !== 1 ? 's' : ''} · {bannedCount} banned
+          {activeCount} active strike{activeCount !== 1 ? 's' : ''} · {bannedCount} banned
           {loading && <span className="overview-header__refreshing"> · refreshing…</span>}
         </p>
       </header>
 
       {users.length === 0 ? (
-        <p className="overview-empty">No warned users on record.</p>
+        <p className="overview-empty">No users with strikes on record.</p>
       ) : (
         <>
           <input
