@@ -40,13 +40,13 @@ function UserSummary({ user, maxStrikes }: { user: DashboardUserDetail; maxStrik
 }
 
 export function UserDetail({ userId, onBack }: UserDetailProps) {
-  const { loading, error, data } = useUser(userId);
+  const { loading, error, data, reload } = useUser(userId);
 
   if (loading) return <LoadingSpinner />;
   if (error) return (
     <div>
       <button className="ud-back" onClick={onBack}>← Back</button>
-      <ErrorMessage message={error} onRetry={() => { /* reload happens on userId change */ }} />
+      <ErrorMessage message={error} onRetry={reload} />
     </div>
   );
   if (!data) return null;
