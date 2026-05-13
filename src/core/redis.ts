@@ -136,7 +136,7 @@ export async function saveStrikeRecord(
 ): Promise<void> {
   await Promise.all([
     redis.set(strikeKey(subredditId, userId), JSON.stringify(record)),
-    redis.zAdd(warnedIndexKey(subredditId), { score: Date.now(), member: userId }),
+    redis.zAdd(warnedIndexKey(subredditId), { score: record.activeStrikes, member: userId }),
   ]);
 }
 
