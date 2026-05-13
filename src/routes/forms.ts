@@ -144,6 +144,13 @@ forms.post('/reset-strikes-submit', async (c) => {
       } catch (err) {
         console.error('Failed to unban user during reset:', err);
         unbanFailed = true;
+        // resetStrikes() already set isBanned=false in Redis — restore it so the
+        // record stays in sync with actual Reddit state.
+        const current = await getStrikeRecord(context.subredditId, pending.userId);
+        if (current) {
+          current.isBanned = true;
+          await saveStrikeRecord(context.subredditId, pending.userId, current);
+        }
       }
     }
 

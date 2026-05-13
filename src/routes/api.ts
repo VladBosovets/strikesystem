@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { context, settings, reddit } from '@devvit/web/server';
-import { DEFAULT_CONFIG, getStrikeRecord, getWarnedUserIds, getModNotes, saveModNotes } from '../core/redis';
+import { DEFAULT_CONFIG, getStrikeRecord, saveStrikeRecord, getWarnedUserIds, getModNotes, saveModNotes } from '../core/redis';
 import { addStrike, checkAndBan, buildWarningDM, resetStrikes } from '../core/strikes';
 import type {
   DashboardConfigResponse,
@@ -168,6 +168,13 @@ api.post('/dashboard/user/:userId/reset', async (c) => {
       wasUnbanned = true;
     } catch (err) {
       console.error('Failed to unban user during dashboard reset:', err);
+      // resetStrikes() already set isBanned=false in Redis — restore it so the
+      // record stays in sync with actual Reddit state.
+      const current = await getStrikeRecord(context.subredditId, userId);
+      if (current) {
+        current.isBanned = true;
+        await saveStrikeRecord(context.subredditId, userId, current);
+      }
     }
   }
 

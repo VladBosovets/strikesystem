@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { DashboardUsersResponse } from '../types/api';
 
 const REFRESH_INTERVAL_MS = 30_000;
@@ -7,18 +7,21 @@ export function useDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DashboardUsersResponse | null>(null);
+  const seqRef = useRef(0);
 
   const load = useCallback(async () => {
+    const seq = ++seqRef.current;
     setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/dashboard/users');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setData((await res.json()) as DashboardUsersResponse);
+      const json = (await res.json()) as DashboardUsersResponse;
+      if (seq === seqRef.current) setData(json);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      if (seq === seqRef.current) setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
-      setLoading(false);
+      if (seq === seqRef.current) setLoading(false);
     }
   }, []);
 
