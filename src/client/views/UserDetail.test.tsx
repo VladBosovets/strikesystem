@@ -4,6 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { UserDetail } from './UserDetail';
 import type { DashboardUserDetailResponse } from '../types/api';
 
+const mockNavigateTo = vi.hoisted(() => vi.fn());
+vi.mock('@devvit/client', () => ({ navigateTo: mockNavigateTo }));
+
 const mockDetail: DashboardUserDetailResponse = {
   user: {
     userId: 't2_u1',
@@ -30,6 +33,7 @@ const mockDetail: DashboardUserDetailResponse = {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  mockNavigateTo.mockClear();
 });
 
 function renderDetail(onBack = vi.fn()) {
@@ -95,7 +99,7 @@ describe('UserDetail', () => {
     expect(onBack).toHaveBeenCalledOnce();
   });
 
-  it('shows a link to the offending post when postUrl is set', async () => {
+  it('shows a button to the offending post when postUrl is set, and navigateTo is called on click', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({
         ...mockDetail,
@@ -107,22 +111,22 @@ describe('UserDetail', () => {
     );
     render(<UserDetail userId="t2_u1" username="alice" onBack={vi.fn()} />);
     await waitFor(() => screen.getByText('u/alice'));
-    const link = screen.getByRole('link', { name: 'View post →' });
-    expect(link.getAttribute('href')).toBe('https://reddit.com/r/test/comments/abc');
-    expect(link.getAttribute('target')).toBe('_blank');
+    const btn = screen.getByRole('button', { name: 'View post →' });
+    await userEvent.click(btn);
+    expect(mockNavigateTo).toHaveBeenCalledWith('https://reddit.com/r/test/comments/abc');
   });
 
-  it('does not show post link when postUrl is empty', async () => {
+  it('does not show post button when postUrl is empty', async () => {
     renderDetail();
     await waitFor(() => screen.getByText('u/alice'));
-    expect(screen.queryByRole('link', { name: 'View post →' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'View post →' })).toBeNull();
   });
 
-  it('shows a link to the removed content when contentUrl is set', async () => {
+  it('shows a button for removed content and navigateTo is called on click', async () => {
     renderDetail();
     await waitFor(() => screen.getByText('u/alice'));
-    const link = screen.getByRole('link', { name: 'View content →' });
-    expect(link.getAttribute('href')).toBe('https://reddit.com/r/x');
-    expect(link.getAttribute('target')).toBe('_blank');
+    const btn = screen.getByRole('button', { name: 'View content →' });
+    await userEvent.click(btn);
+    expect(mockNavigateTo).toHaveBeenCalledWith('https://reddit.com/r/x');
   });
 });
