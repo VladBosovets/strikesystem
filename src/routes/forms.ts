@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { UiResponse } from '@devvit/web/shared';
 import { reddit, context } from '@devvit/web/server';
-import { addStrike, checkAndBan, buildWarningDM, resetStrikes } from '../core/strikes';
+import { addStrike, buildWarningDM, resetStrikes } from '../core/strikes';
 import { popPendingWarn, popPendingReset, popPendingModNote, getModNotes, saveModNotes, popPendingRemoval, getStrikeRecord, saveStrikeRecord } from '../core/redis';
 import type { ModNote, RemovalEntry } from '../core/redis';
 
@@ -41,7 +41,7 @@ forms.post('/warn-user-submit', async (c) => {
     const subredditId = context.subredditId;
     const subredditName = context.subredditName;
 
-    const { newTotal, config } = await addStrike(subredditId, userId, {
+    const { newTotal, config, wasBanned } = await addStrike(subredditId, userId, subredditName, {
       username,
       ruleViolated,
       note,
@@ -70,8 +70,6 @@ forms.post('/warn-user-submit', async (c) => {
       console.error('Failed to send warning DM:', dmErr);
       dmFailed = true;
     }
-
-    const wasBanned = await checkAndBan(subredditId, userId, subredditName, config);
     const dmNote = dmFailed ? ' (DM not delivered — user has messages restricted)' : '';
 
     if (wasBanned) {

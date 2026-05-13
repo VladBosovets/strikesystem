@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { context, settings, reddit } from '@devvit/web/server';
 import { DEFAULT_CONFIG, getStrikeRecord, saveStrikeRecord, getWarnedUserIds, getModNotes, saveModNotes } from '../core/redis';
-import { addStrike, checkAndBan, buildWarningDM, resetStrikes } from '../core/strikes';
+import { addStrike, buildWarningDM, resetStrikes } from '../core/strikes';
 import type {
   DashboardConfigResponse,
   DashboardUsersResponse,
@@ -117,7 +117,7 @@ api.post('/dashboard/user/:userId/strike', async (c) => {
   if (!record) return c.json({ error: 'User not found' }, 404);
   if (record.isBanned) return c.json({ error: 'User is already banned' }, 400);
 
-  const { newTotal, config } = await addStrike(context.subredditId, userId, {
+  const { newTotal, config, wasBanned } = await addStrike(context.subredditId, userId, context.subredditName, {
     username: record.username,
     ruleViolated: rule.trim(),
     note: note?.trim() ?? '',
@@ -140,8 +140,6 @@ api.post('/dashboard/user/:userId/strike', async (c) => {
   } catch {
     dmFailed = true;
   }
-
-  const wasBanned = await checkAndBan(context.subredditId, userId, context.subredditName, config);
 
   return c.json<StrikeActionResponse>({ newTotal, maxStrikes: config.maxStrikesBeforeBan, wasBanned, dmFailed });
 });

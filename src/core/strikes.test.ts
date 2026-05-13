@@ -27,7 +27,7 @@ vi.mock('@devvit/web/server', () => ({
   reddit: { banUser, sendPrivateMessage },
 }));
 
-import { addStrike, checkAndBan, resetStrikes } from './strikes';
+import { addStrike, resetStrikes } from './strikes';
 import { getStrikeRecord } from './redis';
 
 const SUB_ID = 't5_abc' as `t5_${string}`;
@@ -52,7 +52,7 @@ beforeEach(() => {
 
 describe('addStrike', () => {
   it('creates a new record with both counters at 1', async () => {
-    const { newTotal } = await addStrike(SUB_ID, USER_ID, strikeData);
+    const { newTotal } = await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
     expect(newTotal).toBe(1);
 
     const record = await getStrikeRecord(SUB_ID, USER_ID);
@@ -61,8 +61,8 @@ describe('addStrike', () => {
   });
 
   it('increments both totalStrikes and activeStrikes together', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
 
     const record = await getStrikeRecord(SUB_ID, USER_ID);
     expect(record?.totalStrikes).toBe(2);
@@ -70,48 +70,50 @@ describe('addStrike', () => {
   });
 
   it('initialises resets and removals as empty arrays', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
     const record = await getStrikeRecord(SUB_ID, USER_ID);
     expect(record?.resets).toEqual([]);
     expect(record?.removals).toEqual([]);
   });
 
   it('returns activeStrikes as newTotal (used for DM and toast)', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    const { newTotal } = await addStrike(SUB_ID, USER_ID, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    const { newTotal } = await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
     expect(newTotal).toBe(3);
   });
 });
 
-// ─── checkAndBan ─────────────────────────────────────────────────────────────
+// ─── addStrike auto-ban ───────────────────────────────────────────────────────
 
-describe('checkAndBan', () => {
+describe('addStrike auto-ban', () => {
   it('does not ban when activeStrikes is below threshold', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    expect(await checkAndBan(SUB_ID, USER_ID, SUB_NAME)).toBe(false);
+    const { wasBanned } = await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    expect(wasBanned).toBe(false);
     expect(banUser).not.toHaveBeenCalled();
   });
 
-  it('bans when activeStrikes hits the threshold', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    expect(await checkAndBan(SUB_ID, USER_ID, SUB_NAME)).toBe(true);
+  it('bans and returns wasBanned=true on the final strike', async () => {
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    const { wasBanned } = await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    expect(wasBanned).toBe(true);
     expect(banUser).toHaveBeenCalledOnce();
   });
 
-  it('does not ban again if already banned', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await checkAndBan(SUB_ID, USER_ID, SUB_NAME);
-    expect(await checkAndBan(SUB_ID, USER_ID, SUB_NAME)).toBe(false);
+  it('does not ban again on subsequent strikes after user is already banned', async () => {
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData); // triggers ban
+    const { wasBanned } = await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    expect(wasBanned).toBe(false);
     expect(banUser).toHaveBeenCalledOnce();
   });
 
-  it('does not ban if record does not exist', async () => {
-    expect(await checkAndBan(SUB_ID, 't2_nobody' as `t2_${string}`, SUB_NAME)).toBe(false);
+  it('does not ban on first strike for a new user', async () => {
+    const { wasBanned } = await addStrike(SUB_ID, 't2_newuser' as `t2_${string}`, SUB_NAME, strikeData);
+    expect(wasBanned).toBe(false);
+    expect(banUser).not.toHaveBeenCalled();
   });
 });
 
@@ -119,8 +121,8 @@ describe('checkAndBan', () => {
 
 describe('resetStrikes', () => {
   it('sets activeStrikes to 0', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
     await resetStrikes(SUB_ID, USER_ID, 'testmod', 'user improved');
 
     const record = await getStrikeRecord(SUB_ID, USER_ID);
@@ -128,8 +130,8 @@ describe('resetStrikes', () => {
   });
 
   it('does NOT change totalStrikes', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
     await resetStrikes(SUB_ID, USER_ID, 'testmod', '');
 
     const record = await getStrikeRecord(SUB_ID, USER_ID);
@@ -137,8 +139,8 @@ describe('resetStrikes', () => {
   });
 
   it('preserves the full strike history', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
     await resetStrikes(SUB_ID, USER_ID, 'testmod', '');
 
     const record = await getStrikeRecord(SUB_ID, USER_ID);
@@ -146,8 +148,8 @@ describe('resetStrikes', () => {
   });
 
   it('appends a ResetEntry with correct metadata', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
     await resetStrikes(SUB_ID, USER_ID, 'testmod', 'user reformed');
 
     const record = await getStrikeRecord(SUB_ID, USER_ID);
@@ -158,10 +160,9 @@ describe('resetStrikes', () => {
   });
 
   it('clears isBanned flag', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await checkAndBan(SUB_ID, USER_ID, SUB_NAME);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData); // triggers ban
     await resetStrikes(SUB_ID, USER_ID, 'testmod', 'appeal approved');
 
     const record = await getStrikeRecord(SUB_ID, USER_ID);
@@ -174,8 +175,8 @@ describe('resetStrikes', () => {
   });
 
   it('returns the number of strikes that were active at reset', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
     const strikesAtReset = await resetStrikes(SUB_ID, USER_ID, 'testmod', '');
     expect(strikesAtReset).toBe(2);
   });
@@ -185,42 +186,41 @@ describe('resetStrikes', () => {
 
 describe('activeStrikes resets correctly after a reset + new strikes', () => {
   it('activeStrikes starts from 1 again after a reset', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await checkAndBan(SUB_ID, USER_ID, SUB_NAME);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData); // triggers ban
     await resetStrikes(SUB_ID, USER_ID, 'testmod', 'appeal approved');
 
-    const { newTotal } = await addStrike(SUB_ID, USER_ID, strikeData);
+    const { newTotal } = await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
     expect(newTotal).toBe(1); // active restarted from 0
   });
 
   it('totalStrikes keeps accumulating across resets', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
     await resetStrikes(SUB_ID, USER_ID, 'testmod', '');
-    await addStrike(SUB_ID, USER_ID, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
 
     const record = await getStrikeRecord(SUB_ID, USER_ID);
     expect(record?.totalStrikes).toBe(3);
     expect(record?.activeStrikes).toBe(1);
   });
 
-  it('checkAndBan does not trigger during second round until threshold is hit again', async () => {
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await addStrike(SUB_ID, USER_ID, strikeData);
-    await checkAndBan(SUB_ID, USER_ID, SUB_NAME);
+  it('auto-ban does not trigger during second round until threshold is hit again', async () => {
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData);
+    const { wasBanned: firstBan } = await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData); // triggers ban
+    expect(firstBan).toBe(true);
     await resetStrikes(SUB_ID, USER_ID, 'testmod', '');
 
-    await addStrike(SUB_ID, USER_ID, strikeData); // active: 1
-    expect(await checkAndBan(SUB_ID, USER_ID, SUB_NAME)).toBe(false);
+    const r1 = await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData); // active: 1
+    expect(r1.wasBanned).toBe(false);
 
-    await addStrike(SUB_ID, USER_ID, strikeData); // active: 2
-    expect(await checkAndBan(SUB_ID, USER_ID, SUB_NAME)).toBe(false);
+    const r2 = await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData); // active: 2
+    expect(r2.wasBanned).toBe(false);
 
-    await addStrike(SUB_ID, USER_ID, strikeData); // active: 3 → ban
-    expect(await checkAndBan(SUB_ID, USER_ID, SUB_NAME)).toBe(true);
+    const { wasBanned: secondBan } = await addStrike(SUB_ID, USER_ID, SUB_NAME, strikeData); // active: 3 → ban
+    expect(secondBan).toBe(true);
     expect(banUser).toHaveBeenCalledTimes(2); // banned once before, once now
   });
 });

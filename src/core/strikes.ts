@@ -49,13 +49,18 @@ export async function getStrikes(
 export async function addStrike(
   subredditId: string,
   userId: string,
+  subredditName: string,
   data: AddStrikeData
-): Promise<{ newTotal: number; config: Config }> {
+): Promise<{ newTotal: number; config: Config; wasBanned: boolean }> {
   const config = await loadConfig();
+  let wasAlreadyBanned = false;
+
   const record = await updateStrikeRecord(subredditId, userId, (existing) => {
+    wasAlreadyBanned = existing?.isBanned ?? false;
     const now = new Date().toISOString();
     const newTotalStrikes = (existing?.totalStrikes ?? 0) + 1;
     const newActiveStrikes = (existing?.activeStrikes ?? existing?.totalStrikes ?? 0) + 1;
+    const shouldBan = !wasAlreadyBanned && newActiveStrikes >= config.maxStrikesBeforeBan;
 
     return {
       ...(existing ?? {
@@ -81,54 +86,51 @@ export async function addStrike(
       ],
       totalStrikes: newTotalStrikes,
       activeStrikes: newActiveStrikes,
+      isBanned: shouldBan || wasAlreadyBanned,
       lastUpdated: now,
     };
   });
 
   if (!record) throw new Error('Failed to save strike record.');
 
-  // newTotal is activeStrikes — this is what mods see in toasts and DMs
-  return { newTotal: record.activeStrikes, config };
-}
+  // Only the invocation that atomically flipped isBanned fires the side effects.
+  const wasBanned = record.isBanned && !wasAlreadyBanned;
 
-export async function checkAndBan(
-  subredditId: string,
-  userId: string,
-  subredditName: string,
-  providedConfig?: Config
-): Promise<boolean> {
-  const config = providedConfig ?? await loadConfig();
-  const record = await getStrikeRecord(subredditId, userId);
-  if (!record || record.isBanned) return false;
-  if (record.activeStrikes < config.maxStrikesBeforeBan) return false;
-
-  const banReason = buildBanReason(record);
-
-  await reddit.banUser({
-    subredditName,
-    username: record.username,
-    reason: banReason,
-    message: `You have been banned from r/${subredditName} after reaching the maximum number of strikes.`,
-    ...(config.banDuration > 0 ? { duration: config.banDuration } : {}),
-  });
-
-  record.isBanned = true;
-  record.lastUpdated = new Date().toISOString();
-  await saveStrikeRecord(subredditId, userId, record);
-
-  if (config.notifyModmailOnBan) {
+  if (wasBanned) {
     try {
-      await reddit.sendPrivateMessage({
-        to: `/r/${subredditName}`,
-        subject: `Auto-ban triggered: u/${record.username}`,
-        text: `u/${record.username} has been automatically banned after reaching ${record.totalStrikes} strike(s).\n\n${banReason}`,
+      await reddit.banUser({
+        subredditName,
+        username: record.username,
+        reason: buildBanReason(record),
+        message: `You have been banned from r/${subredditName} after reaching the maximum number of strikes.`,
+        ...(config.banDuration > 0 ? { duration: config.banDuration } : {}),
       });
+
+      if (config.notifyModmailOnBan) {
+        try {
+          await reddit.sendPrivateMessage({
+            to: `/r/${subredditName}`,
+            subject: `Auto-ban triggered: u/${record.username}`,
+            text: `u/${record.username} has been automatically banned after reaching ${record.totalStrikes} strike(s).\n\n${buildBanReason(record)}`,
+          });
+        } catch (err) {
+          console.error('Failed to send modmail on auto-ban:', err);
+        }
+      }
     } catch (err) {
-      console.error('Failed to send modmail on auto-ban:', err);
+      console.error('Failed to ban user after strike:', err);
+      // banUser failed but Redis already has isBanned=true — restore to false.
+      const current = await getStrikeRecord(subredditId, userId);
+      if (current) {
+        current.isBanned = false;
+        await saveStrikeRecord(subredditId, userId, current);
+      }
+      return { newTotal: record.activeStrikes, config, wasBanned: false };
     }
   }
 
-  return true;
+  // newTotal is activeStrikes — this is what mods see in toasts and DMs
+  return { newTotal: record.activeStrikes, config, wasBanned };
 }
 
 export async function resetStrikes(
@@ -137,24 +139,25 @@ export async function resetStrikes(
   resetBy: string,
   reason: string
 ): Promise<number | null> {
-  const record = await getStrikeRecord(subredditId, userId);
-  if (!record) return null;
+  let strikesAtReset = 0;
 
-  const strikesAtReset = record.activeStrikes;
+  const result = await updateStrikeRecord(subredditId, userId, (existing) => {
+    if (!existing) return null;
+    strikesAtReset = existing.activeStrikes;
+    const now = new Date().toISOString();
+    return {
+      ...existing,
+      resets: [
+        ...(existing.resets ?? []),
+        { resetAt: now, resetBy, reason, strikesAtReset },
+      ],
+      activeStrikes: 0,
+      isBanned: false,
+      lastUpdated: now,
+    };
+  });
 
-  const resetEntry: ResetEntry = {
-    resetAt: new Date().toISOString(),
-    resetBy,
-    reason,
-    strikesAtReset,
-  };
-
-  record.resets.push(resetEntry);
-  record.activeStrikes = 0;
-  record.isBanned = false;
-  record.lastUpdated = new Date().toISOString();
-
-  await saveStrikeRecord(subredditId, userId, record);
+  if (result === null) return null;
   return strikesAtReset;
 }
 
