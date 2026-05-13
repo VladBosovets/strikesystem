@@ -65,8 +65,8 @@ menu.post('/warn-user', async (c) => {
 
     let historyText =
       currentStrikes === 0
-        ? 'No active warnings.'
-        : `Active warnings: ${currentStrikes}/${maxStrikes}`;
+        ? 'No active strikes.'
+        : `Active strikes: ${currentStrikes}/${maxStrikes}`;
 
     if (existing?.strikes?.length) {
       const lines = existing.strikes.map(
@@ -131,8 +131,8 @@ menu.post('/warn-user', async (c) => {
 
     const isFinalStrike = currentStrikes + 1 >= maxStrikes;
     const title = isFinalStrike
-      ? `⚠️ Issue Warning to u/${targetUser.username} — WARNING: This will trigger AUTO-BAN (${currentStrikes + 1}/${maxStrikes})`
-      : `Issue Warning to u/${targetUser.username} (Warning ${currentStrikes + 1}/${maxStrikes})`;
+      ? `⚠️ Issue Strike to u/${targetUser.username} — WARNING: This will trigger AUTO-BAN (${currentStrikes + 1}/${maxStrikes})`
+      : `Issue Strike to u/${targetUser.username} (Strike ${currentStrikes + 1}/${maxStrikes})`;
 
     return c.json<UiResponse>(
       {
@@ -141,7 +141,7 @@ menu.post('/warn-user', async (c) => {
           form: {
             title,
             fields,
-            acceptLabel: isFinalStrike ? 'Issue Warning & Ban' : 'Issue Warning',
+            acceptLabel: isFinalStrike ? 'Issue Strike & Ban' : 'Issue Strike',
             cancelLabel: 'Cancel',
           },
         },
@@ -320,7 +320,7 @@ menu.post('/reset-strikes', async (c) => {
       username: targetUser.username,
     });
 
-    const statusText = `Active warnings: ${existing.activeStrikes}/${maxStrikes}${existing.isBanned ? '\n⛔ User is currently banned — reset will also clear the ban flag.' : ''}`;
+    const statusText = `Active strikes: ${existing.activeStrikes}/${maxStrikes}${existing.isBanned ? '\n⛔ User is currently banned — reset will also clear the ban flag.' : ''}`;
 
     const fields: FormField[] = [
       {
@@ -343,9 +343,9 @@ menu.post('/reset-strikes', async (c) => {
         showForm: {
           name: 'resetStrikes',
           form: {
-            title: `Reset Warnings — u/${targetUser.username}`,
+            title: `Reset Strikes — u/${targetUser.username}`,
             fields,
-            acceptLabel: 'Reset Warnings',
+            acceptLabel: 'Reset Strikes',
             cancelLabel: 'Cancel',
           },
         },
@@ -622,11 +622,11 @@ menu.post('/view-all-warnings', async (c) => {
         showForm: {
           name: 'viewStrikes',
           form: {
-            title: `Warnings — r/${context.subredditName}`,
+            title: `Strikes — r/${context.subredditName}`,
             fields: [
               {
                 name: 'summary',
-                label: `${totalActive} user(s) with active warnings`,
+                label: `${totalActive} user(s) with active strikes`,
                 type: 'paragraph',
                 defaultValue: displayText,
                 lineHeight: Math.min(3 + userIds.length * 2, 20),

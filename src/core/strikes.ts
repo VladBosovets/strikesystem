@@ -104,7 +104,7 @@ export async function checkAndBan(
     subredditName,
     username: record.username,
     reason: banReason,
-    message: `You have been banned from r/${subredditName} after reaching the maximum number of warnings.`,
+    message: `You have been banned from r/${subredditName} after reaching the maximum number of strikes.`,
     ...(config.banDuration > 0 ? { duration: config.banDuration } : {}),
   });
 
@@ -117,7 +117,7 @@ export async function checkAndBan(
       await reddit.sendPrivateMessage({
         to: `/r/${subredditName}`,
         subject: `Auto-ban triggered: u/${record.username}`,
-        text: `u/${record.username} has been automatically banned after reaching ${record.totalStrikes} warning(s).\n\n${banReason}`,
+        text: `u/${record.username} has been automatically banned after reaching ${record.totalStrikes} strike(s).\n\n${banReason}`,
       });
     } catch (err) {
       console.error('Failed to send modmail on auto-ban:', err);
@@ -176,21 +176,21 @@ export function buildWarningDM(
 
   const escalationWarning =
     strikeNumber === maxStrikes - 1
-      ? '\n⚠️ One more violation may result in a permanent ban from this community.\n'
+      ? '\n⚠️ One more strike may result in a ban from this community.\n'
       : '';
 
   const banNotice =
     strikeNumber >= maxStrikes
-      ? `\nYou have reached the maximum number of warnings and have been banned from r/${subredditName}.\n`
+      ? `\nYou have reached the maximum number of strikes and have been banned from r/${subredditName}.\n`
       : '';
 
   return `Hi u/${username},
 
-A moderator of r/${subredditName} has issued you a warning.
+A moderator of r/${subredditName} has issued you a strike.
 
 Rule violated: ${ruleName}
 
-This is warning ${strikeNumber} of ${maxStrikes}.
+This is strike ${strikeNumber} of ${maxStrikes}.
 ${noteSection}${escalationWarning}${banNotice}
 If you believe this was issued in error, please contact the mod team:
 https://www.reddit.com/message/compose?to=/r/${subredditName}
@@ -200,9 +200,9 @@ https://www.reddit.com/message/compose?to=/r/${subredditName}
 
 function buildBanReason(record: StrikeRecord): string {
   const lines = record.strikes.map(
-    (s) => `Warning ${s.strikeNumber}: ${s.ruleViolated} (${s.issuedAt.slice(0, 10)})`
+    (s) => `Strike ${s.strikeNumber}: ${s.ruleViolated} (${s.issuedAt.slice(0, 10)})`
   );
-  return `Auto-banned after ${record.totalStrikes} warning(s):\n${lines.join('\n')}`;
+  return `Auto-banned after ${record.totalStrikes} strike(s):\n${lines.join('\n')}`;
 }
 
 export function buildAccountIntelDisplay(user: User): string {

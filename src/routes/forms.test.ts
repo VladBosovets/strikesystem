@@ -139,17 +139,17 @@ describe('/warn-user-submit', () => {
     expect(res.showToast).toBe('Please select a rule.');
   });
 
-  it('issues first warning and returns correct count in toast', async () => {
+  it('issues first strike and returns correct count in toast', async () => {
     seedPendingWarn();
     const res = await post('/warn-user-submit', { rule: 'Rule 1' });
-    expect(res.showToast).toContain('Warning 1/3');
+    expect(res.showToast).toContain('Strike 1/3');
     expect(res.showToast).toContain(TARGET_USER);
   });
 
   it('handles rule sent as array (Devvit select field format)', async () => {
     seedPendingWarn();
     const res = await post('/warn-user-submit', { rule: ['Rule 2'] });
-    expect(res.showToast).toContain('Warning 1/3');
+    expect(res.showToast).toContain('Strike 1/3');
   });
 
   it('sends a DM to the warned user', async () => {
@@ -160,11 +160,11 @@ describe('/warn-user-submit', () => {
     );
   });
 
-  it('counts from existing active strikes on second warning', async () => {
+  it('counts from existing active strikes on second strike', async () => {
     seedStrikeRecord(1);
     seedPendingWarn();
     const res = await post('/warn-user-submit', { rule: 'Rule 1' });
-    expect(res.showToast).toContain('Warning 2/3');
+    expect(res.showToast).toContain('Strike 2/3');
   });
 
   it('auto-bans on final warning and returns ban toast', async () => {
@@ -228,7 +228,7 @@ describe('/reset-strikes-submit', () => {
     seedStrikeRecord(2);
     seedPendingReset();
     const res = await post('/reset-strikes-submit', { reason: 'appeal approved' });
-    expect(res.showToast).toContain('2 active warning(s) cleared');
+    expect(res.showToast).toContain('2 active strike(s) cleared');
     expect(res.showToast).toContain(TARGET_USER);
   });
 

@@ -25,17 +25,17 @@ describe('buildWarningDM', () => {
 
   it('shows correct strike count', () => {
     const msg = buildWarningDM(base.username, base.subredditName, 2, 3, base.ruleName, '', '');
-    expect(msg).toContain('warning 2 of 3');
+    expect(msg).toContain('strike 2 of 3');
   });
 
   it('does not include escalation warning on first strike', () => {
     const msg = buildWarningDM(base.username, base.subredditName, 1, 3, base.ruleName, '', '');
-    expect(msg).not.toContain('One more violation');
+    expect(msg).not.toContain('One more strike');
   });
 
   it('includes escalation warning on penultimate strike', () => {
     const msg = buildWarningDM(base.username, base.subredditName, 2, 3, base.ruleName, '', '');
-    expect(msg).toContain('One more violation');
+    expect(msg).toContain('One more strike');
   });
 
   it('includes ban notice on final strike', () => {
