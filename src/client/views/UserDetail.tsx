@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { navigateTo } from '@devvit/client';
 import type { DashboardUserDetail, StrikeActionResponse, ResetActionResponse } from '../types/api';
 import { useUser } from '../hooks/useUser';
@@ -15,7 +16,7 @@ export interface UserDetailProps {
 
 type ActivePanel = 'strike' | 'reset' | 'note' | null;
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="ud-section">
       <h2 className="ud-section__title">{title}</h2>

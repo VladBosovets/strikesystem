@@ -3,6 +3,7 @@ import type { User } from '@devvit/reddit';
 import {
   getStrikeRecord,
   saveStrikeRecord,
+  updateStrikeRecord,
   DEFAULT_CONFIG,
   type StrikeRecord,
   type Config,
@@ -51,40 +52,43 @@ export async function addStrike(
   data: AddStrikeData
 ): Promise<{ newTotal: number; config: Config }> {
   const config = await loadConfig();
-  const existing = await getStrikeRecord(subredditId, userId);
+  const record = await updateStrikeRecord(subredditId, userId, (existing) => {
+    const now = new Date().toISOString();
+    const newTotalStrikes = (existing?.totalStrikes ?? 0) + 1;
+    const newActiveStrikes = (existing?.activeStrikes ?? existing?.totalStrikes ?? 0) + 1;
 
-  const newTotalStrikes = (existing?.totalStrikes ?? 0) + 1;
-  const newActiveStrikes = (existing?.activeStrikes ?? existing?.totalStrikes ?? 0) + 1;
-
-  const record: StrikeRecord = existing ?? {
-    userId,
-    username: data.username,
-    strikes: [],
-    resets: [],
-    removals: [],
-    totalStrikes: 0,
-    activeStrikes: 0,
-    isBanned: false,
-    lastUpdated: new Date().toISOString(),
-  };
-
-  record.strikes.push({
-    strikeNumber: newTotalStrikes,
-    ruleViolated: data.ruleViolated,
-    note: data.note,
-    issuedBy: data.issuedBy,
-    issuedAt: new Date().toISOString(),
-    postUrl: data.postUrl,
+    return {
+      ...(existing ?? {
+        userId,
+        username: data.username,
+        resets: [],
+        removals: [],
+        totalStrikes: 0,
+        activeStrikes: 0,
+        isBanned: false,
+      }),
+      username: data.username,
+      strikes: [
+        ...(existing?.strikes ?? []),
+        {
+          strikeNumber: newTotalStrikes,
+          ruleViolated: data.ruleViolated,
+          note: data.note,
+          issuedBy: data.issuedBy,
+          issuedAt: now,
+          postUrl: data.postUrl,
+        },
+      ],
+      totalStrikes: newTotalStrikes,
+      activeStrikes: newActiveStrikes,
+      lastUpdated: now,
+    };
   });
-  record.totalStrikes = newTotalStrikes;
-  record.activeStrikes = newActiveStrikes;
-  record.username = data.username;
-  record.lastUpdated = new Date().toISOString();
 
-  await saveStrikeRecord(subredditId, userId, record);
+  if (!record) throw new Error('Failed to save strike record.');
 
   // newTotal is activeStrikes — this is what mods see in toasts and DMs
-  return { newTotal: newActiveStrikes, config };
+  return { newTotal: record.activeStrikes, config };
 }
 
 export async function checkAndBan(

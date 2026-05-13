@@ -28,7 +28,10 @@ export function useDashboard() {
   useEffect(() => {
     void load();
     const id = setInterval(() => { void load(); }, REFRESH_INTERVAL_MS);
-    return () => { clearInterval(id); };
+    return () => {
+      clearInterval(id);
+      seqRef.current++;
+    };
   }, [load]);
 
   return { loading, error, data, reload: load };

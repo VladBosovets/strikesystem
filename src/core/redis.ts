@@ -140,6 +140,52 @@ export async function saveStrikeRecord(
   ]);
 }
 
+export async function updateStrikeRecord(
+  subredditId: string,
+  userId: string,
+  update: (record: StrikeRecord | null) => StrikeRecord | null
+): Promise<StrikeRecord | null> {
+  const key = strikeKey(subredditId, userId);
+  const indexKey = warnedIndexKey(subredditId);
+
+  if (typeof redis.watch !== 'function') {
+    const next = update(await getStrikeRecord(subredditId, userId));
+    if (next) await saveStrikeRecord(subredditId, userId, next);
+    return next;
+  }
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const tx = await redis.watch(key);
+    try {
+      const raw = await redis.get(key);
+      const current = raw
+        ? normalizeRecord(JSON.parse(raw) as Parameters<typeof normalizeRecord>[0])
+        : null;
+      const next = update(current);
+
+      if (!next) {
+        await tx.unwatch();
+        return null;
+      }
+
+      await tx.multi();
+      await tx.set(key, JSON.stringify(next));
+      await tx.zAdd(indexKey, { score: next.activeStrikes, member: userId });
+      const result = await tx.exec();
+      if (result != null && result.length > 0) return next;
+    } catch (err) {
+      try {
+        await tx.discard();
+      } catch {
+        // The transaction may already have been closed by EXEC.
+      }
+      if (attempt === 4) throw err;
+    }
+  }
+
+  throw new Error('Could not update strike record after concurrent modifications.');
+}
+
 export async function getConfig(subredditId: string): Promise<Config> {
   const raw = await redis.get(configKey(subredditId));
   return raw ? (JSON.parse(raw) as Config) : { ...DEFAULT_CONFIG };
