@@ -2,17 +2,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── mocks ────────────────────────────────────────────────────────────────────
 
-const { store, mockZRange, mockContext, mockUser } = vi.hoisted(() => {
+const { store, mockZRange, mockContext, mockUser, mockReddit } = vi.hoisted(() => {
   const mockUser = {
     getModPermissionsForSubreddit: vi.fn(async () => ['all'] as string[]),
   };
   const mockZRange = vi.fn(async () => [] as { member: string; score: number }[]);
+  const mockReddit = {
+    getCurrentUser: vi.fn(async () => mockUser),
+    sendPrivateMessage: vi.fn(async () => {}),
+    banUser: vi.fn(async () => {}),
+    unbanUser: vi.fn(async () => {}),
+  };
   return {
     store: new Map<string, string>(),
     mockZRange,
     mockUser,
+    mockReddit,
     mockContext: {
       userId: 't2_mod123' as string | undefined,
+      username: 'testmod' as string | undefined,
       subredditId: 't5_sub123' as string,
       subredditName: 'testsubreddit',
     },
@@ -29,12 +37,14 @@ vi.mock('@devvit/web/server', () => ({
     zRange: mockZRange,
   },
   context: mockContext,
-  reddit: {
-    getCurrentUser: vi.fn(async () => mockUser),
-  },
+  reddit: mockReddit,
   settings: {
     get: vi.fn(async (key: string) => {
       if (key === 'maxStrikes') return 3;
+      if (key === 'banDuration') return 0;
+      if (key === 'rules') return 'Rule 1\nRule 2\nRule 3';
+      if (key === 'warningMessage') return '';
+      if (key === 'notifyModmail') return false;
       return undefined;
     }),
   },
@@ -87,11 +97,23 @@ async function get(path: string) {
   return api.request(path, { method: 'GET' });
 }
 
+async function post(path: string, body: unknown) {
+  return api.request(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 beforeEach(() => {
   store.clear();
   mockZRange.mockResolvedValue([]);
   mockContext.userId = 't2_mod123';
+  mockContext.username = 'testmod';
   mockUser.getModPermissionsForSubreddit.mockResolvedValue(['all']);
+  mockReddit.sendPrivateMessage.mockClear();
+  mockReddit.banUser.mockClear();
+  mockReddit.unbanUser.mockClear();
 });
 
 // ─── permission checks ────────────────────────────────────────────────────────
@@ -293,5 +315,139 @@ describe('GET /dashboard/user/:userId', () => {
     const res = await get('/dashboard/user/t2_user1');
     const body = await res.json() as { user: { modNotes: unknown[] } };
     expect(body.user.modNotes).toEqual([]);
+  });
+
+  it('includes rules array in response', async () => {
+    seedUser('t2_user1', 'alice', 1);
+    const res = await get('/dashboard/user/t2_user1');
+    const body = await res.json() as { rules: string[] };
+    expect(body.rules).toEqual(['Rule 1', 'Rule 2', 'Rule 3']);
+  });
+});
+
+// ─── POST /dashboard/user/:userId/strike ─────────────────────────────────────
+
+describe('POST /dashboard/user/:userId/strike', () => {
+  it('issues a strike and returns newTotal', async () => {
+    seedUser('t2_user1', 'alice', 0);
+    const res = await post('/dashboard/user/t2_user1/strike', { rule: 'Rule 1', note: '' });
+    const body = await res.json() as { newTotal: number; wasBanned: boolean };
+    expect(res.status).toBe(200);
+    expect(body.newTotal).toBe(1);
+    expect(body.wasBanned).toBe(false);
+  });
+
+  it('returns 400 when rule is missing', async () => {
+    seedUser('t2_user1', 'alice', 0);
+    const res = await post('/dashboard/user/t2_user1/strike', { rule: '' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 when user has no record', async () => {
+    const res = await post('/dashboard/user/t2_nobody/strike', { rule: 'Rule 1' });
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 400 when user is already banned', async () => {
+    seedUser('t2_user1', 'alice', 3, true);
+    const res = await post('/dashboard/user/t2_user1/strike', { rule: 'Rule 1' });
+    expect(res.status).toBe(400);
+  });
+
+  it('sets wasBanned true and triggers auto-ban on final strike', async () => {
+    seedUser('t2_user1', 'alice', 2);
+    const res = await post('/dashboard/user/t2_user1/strike', { rule: 'Rule 1' });
+    const body = await res.json() as { wasBanned: boolean };
+    expect(body.wasBanned).toBe(true);
+    expect(mockReddit.banUser).toHaveBeenCalled();
+  });
+
+  it('sets dmFailed true when sendPrivateMessage throws', async () => {
+    mockReddit.sendPrivateMessage.mockRejectedValueOnce(new Error('NOT_WHITELISTED'));
+    seedUser('t2_user1', 'alice', 0);
+    const res = await post('/dashboard/user/t2_user1/strike', { rule: 'Rule 1' });
+    const body = await res.json() as { dmFailed: boolean };
+    expect(body.dmFailed).toBe(true);
+  });
+
+  it('returns 403 for non-mods', async () => {
+    mockUser.getModPermissionsForSubreddit.mockResolvedValueOnce([]);
+    seedUser('t2_user1', 'alice', 0);
+    const res = await post('/dashboard/user/t2_user1/strike', { rule: 'Rule 1' });
+    expect(res.status).toBe(403);
+  });
+});
+
+// ─── POST /dashboard/user/:userId/reset ──────────────────────────────────────
+
+describe('POST /dashboard/user/:userId/reset', () => {
+  it('resets strikes and returns strikesCleared', async () => {
+    seedUser('t2_user1', 'alice', 2);
+    const res = await post('/dashboard/user/t2_user1/reset', { reason: 'appeal' });
+    const body = await res.json() as { strikesCleared: number; wasUnbanned: boolean };
+    expect(res.status).toBe(200);
+    expect(body.strikesCleared).toBe(2);
+    expect(body.wasUnbanned).toBe(false);
+  });
+
+  it('calls unbanUser and sets wasUnbanned when user was banned', async () => {
+    seedUser('t2_user1', 'alice', 3, true);
+    const res = await post('/dashboard/user/t2_user1/reset', { reason: 'appeal' });
+    const body = await res.json() as { wasUnbanned: boolean };
+    expect(mockReddit.unbanUser).toHaveBeenCalledWith('alice', 'testsubreddit');
+    expect(body.wasUnbanned).toBe(true);
+  });
+
+  it('returns 400 when reason is missing', async () => {
+    seedUser('t2_user1', 'alice', 2);
+    const res = await post('/dashboard/user/t2_user1/reset', { reason: '' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 when user has no record', async () => {
+    const res = await post('/dashboard/user/t2_nobody/reset', { reason: 'appeal' });
+    expect(res.status).toBe(404);
+  });
+
+  it('writes an auto mod note on reset', async () => {
+    seedUser('t2_user1', 'alice', 2);
+    await post('/dashboard/user/t2_user1/reset', { reason: 'good behaviour' });
+    const notes = JSON.parse(store.get(`mod-notes:${SUB}:t2_user1`) ?? '[]') as { text: string }[];
+    expect(notes[0]?.text).toContain('Strikes reset');
+    expect(notes[0]?.text).toContain('good behaviour');
+  });
+});
+
+// ─── POST /dashboard/user/:userId/note ───────────────────────────────────────
+
+describe('POST /dashboard/user/:userId/note', () => {
+  it('saves a mod note and returns success', async () => {
+    seedUser('t2_user1', 'alice', 1);
+    const res = await post('/dashboard/user/t2_user1/note', { note: 'watch carefully' });
+    const body = await res.json() as { success: boolean };
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    const notes = JSON.parse(store.get(`mod-notes:${SUB}:t2_user1`) ?? '[]') as { text: string }[];
+    expect(notes[0]?.text).toBe('watch carefully');
+  });
+
+  it('returns 400 when note is empty', async () => {
+    seedUser('t2_user1', 'alice', 1);
+    const res = await post('/dashboard/user/t2_user1/note', { note: '' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 when user has no record', async () => {
+    const res = await post('/dashboard/user/t2_nobody/note', { note: 'test' });
+    expect(res.status).toBe(404);
+  });
+
+  it('appends to existing notes', async () => {
+    seedUser('t2_user1', 'alice', 1);
+    seedModNotes('t2_user1');
+    await post('/dashboard/user/t2_user1/note', { note: 'second note' });
+    const notes = JSON.parse(store.get(`mod-notes:${SUB}:t2_user1`) ?? '[]') as { text: string }[];
+    expect(notes).toHaveLength(2);
+    expect(notes[1]?.text).toBe('second note');
   });
 });

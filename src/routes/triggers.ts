@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import type {
   OnAppInstallRequest,
   OnPostDeleteRequest,
-  OnCommentDeleteRequest,
   TriggerResponse,
 } from '@devvit/web/shared';
 import { context } from '@devvit/web/server';
@@ -27,9 +26,5 @@ triggers.post('/on-post-delete', async (c) => {
 });
 
 triggers.post('/on-comment-delete', async (c) => {
-  const input = await c.req.json<OnCommentDeleteRequest>();
-  console.log(
-    `Comment deleted: ${input.commentId} by u/${input.author?.name ?? 'unknown'} in r/${input.subreddit?.name ?? 'unknown'}`
-  );
   return c.json<TriggerResponse>({}, 200);
 });

@@ -5,6 +5,7 @@ const { store, mockReddit, mockContext } = vi.hoisted(() => ({
   mockReddit: {
     sendPrivateMessage: vi.fn(async () => {}),
     banUser: vi.fn(async () => {}),
+    unbanUser: vi.fn(async () => {}),
     remove: vi.fn(async () => {}),
   },
   mockContext: {
@@ -89,7 +90,7 @@ function seedPendingRemoval(contentType: 'post' | 'comment' = 'post') {
   }));
 }
 
-function seedStrikeRecord(activeStrikes: number, totalStrikes = activeStrikes) {
+function seedStrikeRecord(activeStrikes: number, totalStrikes = activeStrikes, isBanned = false) {
   store.set(keys.strike(), JSON.stringify({
     userId: TARGET_ID,
     username: TARGET_USER,
@@ -105,7 +106,7 @@ function seedStrikeRecord(activeStrikes: number, totalStrikes = activeStrikes) {
     removals: [],
     totalStrikes,
     activeStrikes,
-    isBanned: false,
+    isBanned,
     lastUpdated: '2026-01-01T00:00:00.000Z',
   }));
 }
@@ -114,6 +115,7 @@ beforeEach(() => {
   store.clear();
   mockReddit.sendPrivateMessage.mockClear();
   mockReddit.banUser.mockClear();
+  mockReddit.unbanUser.mockClear();
   mockReddit.remove.mockClear();
   mockContext.userId = 't2_mod123';
   mockContext.username = 'testmod';
@@ -296,6 +298,21 @@ describe('/reset-strikes-submit', () => {
     await post('/reset-strikes-submit', { reason: 'appeal' });
     const res = await post('/reset-strikes-submit', { reason: 'again' });
     expect(res.showToast).toBe('Session expired. Please try again.');
+  });
+
+  it('calls unbanUser when the user was banned', async () => {
+    seedStrikeRecord(3, 3, true);
+    seedPendingReset();
+    const res = await post('/reset-strikes-submit', { reason: 'appeal approved' });
+    expect(mockReddit.unbanUser).toHaveBeenCalledWith(TARGET_USER, 'testsubreddit');
+    expect(res.showToast).toContain('User has been unbanned.');
+  });
+
+  it('does not call unbanUser when the user was not banned', async () => {
+    seedStrikeRecord(2);
+    seedPendingReset();
+    await post('/reset-strikes-submit', { reason: 'appeal' });
+    expect(mockReddit.unbanUser).not.toHaveBeenCalled();
   });
 });
 

@@ -57,12 +57,30 @@ export type DashboardUserDetail = {
   modNotes: ModNote[];
 };
 
-export type DashboardUserDetailResponse = {
-  user: DashboardUserDetail;
-  maxStrikes: number;
-};
-
 export type DashboardConfigResponse = {
   maxStrikes: number;
   subredditName: string;
+  rules: string[];
+};
+
+export type DashboardUserDetailResponse = {
+  user: DashboardUserDetail;
+  maxStrikes: number;
+  rules: string[];
+};
+
+export type StrikeActionResponse = {
+  newTotal: number;
+  maxStrikes: number;
+  wasBanned: boolean;
+  dmFailed: boolean;
+};
+
+export type ResetActionResponse = {
+  strikesCleared: number;
+  wasUnbanned: boolean;
+};
+
+export type NoteActionResponse = {
+  success: boolean;
 };

@@ -119,6 +119,10 @@ forms.post('/reset-strikes-submit', async (c) => {
     }
 
     const resetBy = context.username ?? 'moderator';
+
+    const recordBeforeReset = await getStrikeRecord(context.subredditId, pending.userId);
+    const wasBanned = recordBeforeReset?.isBanned ?? false;
+
     const strikesCleared = await resetStrikes(
       context.subredditId,
       pending.userId,
@@ -133,17 +137,26 @@ forms.post('/reset-strikes-submit', async (c) => {
       );
     }
 
+    if (wasBanned) {
+      try {
+        await reddit.unbanUser(pending.username, context.subredditName);
+      } catch (err) {
+        console.error('Failed to unban user during reset:', err);
+      }
+    }
+
     const existingNotes = await getModNotes(context.subredditId, pending.userId);
     const autoNote: ModNote = {
       id: `reset-${Date.now()}`,
-      text: `⚠️ Strikes reset (${strikesCleared} cleared) — Reason: ${reason}`,
+      text: `⚠️ Strikes reset (${strikesCleared} cleared)${wasBanned ? ' — user unbanned' : ''} — Reason: ${reason}`,
       author: resetBy,
       createdAt: new Date().toISOString(),
     };
     await saveModNotes(context.subredditId, pending.userId, [...existingNotes, autoNote]);
 
+    const unbanNote = wasBanned ? ' User has been unbanned.' : '';
     return c.json<UiResponse>(
-      { showToast: `Strikes reset for u/${pending.username}. ${strikesCleared} active strike(s) cleared.` },
+      { showToast: `Strikes reset for u/${pending.username}. ${strikesCleared} active strike(s) cleared.${unbanNote}` },
       200
     );
   } catch (err) {

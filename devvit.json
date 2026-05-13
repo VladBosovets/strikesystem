@@ -112,8 +112,7 @@
   },
   "triggers": {
     "onAppInstall": "/internal/triggers/on-app-install",
-    "onPostDelete": "/internal/triggers/on-post-delete",
-    "onCommentDelete": "/internal/triggers/on-comment-delete"
+    "onPostDelete": "/internal/triggers/on-post-delete"
   },
   "settings": {
     "global": {
