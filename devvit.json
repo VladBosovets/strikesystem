@@ -158,5 +158,8 @@
   },
   "dev": {
     "subreddit": "strikesystem_dev"
+  },
+  "marketingAssets": {
+    "icon": "assets/icon.png"
   }
 }

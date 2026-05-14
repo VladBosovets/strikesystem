@@ -158,6 +158,12 @@ The toast and the user's mod note will explicitly say "Could not unban automatic
 
 ---
 
+## For App Reviewers
+
+Please assign this app to the **Moderator Tools** category in the App Directory.
+
+---
+
 ## Tech stack
 
 - [Devvit](https://developers.reddit.com/) — Reddit's developer platform (`@devvit/web` 0.12.22)
