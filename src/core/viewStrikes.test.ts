@@ -12,32 +12,32 @@ function makeUser(ageDays: number, linkKarma: number, commentKarma: number) {
 }
 
 describe('buildAccountIntelDisplay', () => {
-  it('shows 🚨 for accounts under 7 days old', () => {
+  it('shows [!!] for accounts under 7 days old', () => {
     const display = buildAccountIntelDisplay(makeUser(3, 5, 2) as never);
-    expect(display).toContain('🚨 Very new account');
+    expect(display).toContain('[!!] Very new account');
   });
 
-  it('shows ⚠️ for accounts 7–29 days old', () => {
+  it('shows [!] for accounts 7–29 days old', () => {
     const display = buildAccountIntelDisplay(makeUser(15, 50, 50) as never);
-    expect(display).toContain('⚠️ New account');
-    expect(display).not.toContain('🚨');
+    expect(display).toContain('[!] New account');
+    expect(display).not.toContain('[!!]');
   });
 
   it('shows no age warning for accounts 30+ days old', () => {
     const display = buildAccountIntelDisplay(makeUser(200, 500, 500) as never);
-    expect(display).not.toContain('⚠️ New account');
-    expect(display).not.toContain('🚨 Very new');
+    expect(display).not.toContain('[!] New account');
+    expect(display).not.toContain('[!!] Very new');
   });
 
-  it('shows 🚨 for almost-zero karma (< 10)', () => {
+  it('shows [!!] for almost-zero karma (< 10)', () => {
     const display = buildAccountIntelDisplay(makeUser(100, 2, 3) as never);
-    expect(display).toContain('🚨 Almost zero karma');
+    expect(display).toContain('[!!] Almost zero karma');
   });
 
-  it('shows ⚠️ for very low karma (10–99)', () => {
+  it('shows [!] for very low karma (10–99)', () => {
     const display = buildAccountIntelDisplay(makeUser(100, 10, 40) as never);
-    expect(display).toContain('⚠️ Very low karma');
-    expect(display).not.toContain('🚨 Almost zero');
+    expect(display).toContain('[!] Very low karma');
+    expect(display).not.toContain('[!!] Almost zero');
   });
 
   it('shows no karma warning for normal karma (100+)', () => {
@@ -63,8 +63,8 @@ describe('buildAccountIntelDisplay', () => {
 
   it('can show multiple risk signals at once', () => {
     const display = buildAccountIntelDisplay(makeUser(2, 1, 0) as never);
-    expect(display).toContain('🚨 Very new account');
-    expect(display).toContain('🚨 Almost zero karma');
+    expect(display).toContain('[!!] Very new account');
+    expect(display).toContain('[!!] Almost zero karma');
   });
 });
 
@@ -112,7 +112,7 @@ describe('buildStrikeHistoryDisplay', () => {
       activeStrikes: 1,
       isBanned: true,
     });
-    expect(buildStrikeHistoryDisplay(record, 3)).toContain('⛔');
+    expect(buildStrikeHistoryDisplay(record, 3)).toContain('[BANNED]');
   });
 
   it('does not show banned status when not banned', () => {
@@ -121,7 +121,7 @@ describe('buildStrikeHistoryDisplay', () => {
       totalStrikes: 1,
       activeStrikes: 1,
     });
-    expect(buildStrikeHistoryDisplay(record, 3)).not.toContain('⛔');
+    expect(buildStrikeHistoryDisplay(record, 3)).not.toContain('[BANNED]');
   });
 
   it('includes the rule and mod for each strike', () => {

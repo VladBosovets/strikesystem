@@ -559,6 +559,14 @@ menu.post('/create-dashboard-post', async (c) => {
     });
 
     await saveDashboardPost(context.subredditId, post.id, post.url);
+
+    // Guard against concurrent creation: if another mod's write landed first, delete ours and use theirs.
+    const saved = await getDashboardPost(context.subredditId);
+    if (saved && saved.id !== post.id) {
+      try { await reddit.remove(post.id as `t3_${string}`, false); } catch { /* best effort */ }
+      return c.json<UiResponse>({ navigateTo: saved.url }, 200);
+    }
+
     return c.json<UiResponse>({ navigateTo: post.url }, 200);
   } catch (err) {
     console.error('create-dashboard-post menu error:', err);
@@ -597,9 +605,8 @@ menu.post('/view-all-warnings', async (c) => {
     const cleared = records.filter((r) => r && !r.isBanned && r.activeStrikes === 0) as NonNullable<typeof records[number]>[];
 
     const fmt = (r: NonNullable<typeof records[number]>) => {
-      if (r.isBanned) return `⛔ u/${r.username} — BANNED (${r.totalStrikes} total)`;
-      const bar = '█'.repeat(r.activeStrikes) + '░'.repeat(Math.max(0, maxStrikes - r.activeStrikes));
-      return `⚠️ u/${r.username} — ${r.activeStrikes}/${maxStrikes}  ${bar}`;
+      if (r.isBanned) return `[BANNED] u/${r.username} — ${r.totalStrikes} total strike(s)`;
+      return `u/${r.username} — ${r.activeStrikes}/${maxStrikes} strikes`;
     };
 
     const sections: string[] = [];
@@ -611,7 +618,7 @@ menu.post('/view-all-warnings', async (c) => {
       sections.push(`Banned (${banned.length}):\n${banned.map(fmt).join('\n')}`);
     }
     if (cleared.length > 0) {
-      sections.push(`Cleared / no active strikes (${cleared.length}):\n${cleared.map((r) => `✓ u/${r.username} — ${r.totalStrikes} all-time`).join('\n')}`);
+      sections.push(`Cleared / no active strikes (${cleared.length}):\n${cleared.map((r) => `u/${r.username} — ${r.totalStrikes} all-time, 0 active`).join('\n')}`);
     }
 
     const displayText = sections.join('\n\n');

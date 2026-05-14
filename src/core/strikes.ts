@@ -193,6 +193,8 @@ export function buildWarningDM(
 
   return `Hi u/${username},
 
+Note: This is an automated message. Do not reply here — replies go to an unmonitored account. To contact the mod team, use the link at the bottom of this message.
+
 A moderator of r/${subredditName} has issued you a strike.
 
 Rule violated: ${ruleName}
@@ -219,14 +221,14 @@ export function buildAccountIntelDisplay(user: User): string {
   const totalKarma = user.linkKarma + user.commentKarma;
 
   const ageLabel =
-    ageDays < 7   ? `${ageDays}d  🚨 Very new account` :
-    ageDays < 30  ? `${ageDays}d  ⚠️ New account` :
+    ageDays < 7   ? `${ageDays}d  [!!] Very new account` :
+    ageDays < 30  ? `${ageDays}d  [!] New account` :
     ageDays < 365 ? `${Math.floor(ageDays / 30)}mo` :
                     `${Math.floor(ageDays / 365)}yr`;
 
   const karmaLabel =
-    totalKarma < 10  ? `${totalKarma}  🚨 Almost zero karma` :
-    totalKarma < 100 ? `${totalKarma}  ⚠️ Very low karma` :
+    totalKarma < 10  ? `${totalKarma}  [!!] Almost zero karma` :
+    totalKarma < 100 ? `${totalKarma}  [!] Very low karma` :
                        String(totalKarma);
 
   return [
@@ -244,7 +246,7 @@ export function buildStrikeHistoryDisplay(
   const lines: string[] = [];
 
   lines.push(`Active: ${record.activeStrikes}/${maxStrikes}  |  All-time: ${record.totalStrikes}`);
-  if (record.isBanned) lines.push('⛔ Currently banned');
+  if (record.isBanned) lines.push('[BANNED]');
   lines.push('');
 
   for (const s of record.strikes) {
