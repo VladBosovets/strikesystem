@@ -5,6 +5,60 @@ Issues are grouped by priority. Start with P1 before touching anything else.
 
 ---
 
+## Completed (on `development` / `feedback-fixes` branches)
+
+### P1 #3 — Guard auto-ban side effects atomically ✅
+`isBanned=true` is now set inside the `updateStrikeRecord` callback. `checkAndBan` is deleted.
+Only the invocation that flips the flag fires `banUser()` and modmail. If `banUser` throws,
+`isBanned` is restored to `false`. `addStrike` now takes `subredditName` as a parameter.
+
+### P1 #2 — Wrap `resetStrikes` in `updateStrikeRecord` ✅
+`resetStrikes` now uses the callback pattern with optimistic locking.
+`strikesAtReset` is captured via closure from the winning callback execution.
+Note: mod note additions and removal appends are still plain read-mutate-write (see P1 #2 below).
+
+### P2 #4 — Auto-refresh user detail view ✅
+`useUser.ts` now polls every 30s using the seqRef pattern. Stale state during active incidents
+is no longer possible.
+
+### P2 #5 — Reload after failed action ✅
+`StrikePanel` and `ResetPanel` accept an `onReload` prop. On any failed action the UI
+reloads user data before displaying the error, so concurrent mod conflicts self-correct.
+
+### P2 #6 — Validate config values ✅
+`loadConfig` clamps `maxStrikesBeforeBan` to `Math.max(1, ...)` and `banDuration` to
+`Math.max(0, ...)`. Bad settings can no longer trigger immediate bans or silently behave wrong.
+
+### P2 #7 — Defensive fallback for empty rules ✅
+Both `menu.ts` and `api.ts` now fall back to `DEFAULT_CONFIG.rules` when the parsed rules
+list is empty. Strike/remove forms are never left with no selectable rule.
+
+### P4 #12 — Reset wording ✅
+Button label and panel title updated to "Reset Active Strikes" throughout `UserDetail.tsx`.
+
+### Additional fixes shipped outside the original plan
+
+- **Emoji/black-box fix**: `buildAccountIntelDisplay`, `buildStrikeHistoryDisplay`, and
+  `menu.ts` view-all-warnings replaced all emoji and Unicode block chars (`⛔ 🚨 ⚠️ █ ░ ✓`)
+  with plain ASCII equivalents (`[BANNED]`, `[!!]`, `[!]`). Devvit paragraph fields render
+  emoji as black boxes.
+
+- **DM reply warning**: Warning DMs now open with an explicit note that replies go to an
+  unmonitored account and direct users to the modmail link instead.
+
+- **Dashboard duplicate creation fix**: After creating a dashboard post, the handler
+  re-reads the stored ref. If it doesn't match the new post, the new post is deleted and
+  the mod is navigated to the existing one.
+
+- **App install modmail**: `on-app-install` trigger now sends a setup guide to subreddit
+  modmail covering all menu actions and configuration steps.
+
+- **Dashboard mod-only message**: Non-mods who open the dashboard post see "This dashboard
+  is for moderators only." instead of a blank/broken loading state. Implemented by detecting
+  the 403 from `/api/dashboard/users` in `useDashboard.ts` and rendering a gate in `App.tsx`.
+
+---
+
 ## P1 — Data Integrity (fix before any broad install)
 
 ### 1. Per-form pending tokens (issue #1)
@@ -22,86 +76,19 @@ Files: `src/core/redis.ts` (pending key shape), `src/routes/menu.ts` (add nonce 
 
 ---
 
-### 2. Wrap reset, mod notes, and removal appends in updateStrikeRecord (issues #3, #7)
+### 2. Wrap mod notes and removal appends in updateStrikeRecord (issues #3, #7)
 
-**Problem:** `addStrike` uses `updateStrikeRecord` with optimistic locking, but
-`resetStrikes`, mod note additions, and removal logging all do plain read-mutate-write.
-Concurrent mods can overwrite each other's writes.
+**Problem:** Mod note additions and removal logging still do plain read-mutate-write.
+Concurrent mods can overwrite each other's writes. (`resetStrikes` is already fixed — see above.)
 
-**Fix:** Refactor `resetStrikes` in `strikes.ts` and the note/removal append logic in
-`api.ts` and `forms.ts` to use the `updateStrikeRecord` callback pattern, which uses
-`redis.watch` / MULTI / EXEC optimistic locking.
+**Fix:** Refactor the note/removal append logic in `api.ts` and `forms.ts` to use the
+`updateStrikeRecord` callback pattern with `redis.watch` / MULTI / EXEC optimistic locking.
 
-Files: `src/core/strikes.ts` (`resetStrikes`), `src/routes/api.ts` (note/removal appends),
-`src/routes/forms.ts` (note/removal appends).
-
----
-
-### 3. Guard auto-ban side effects atomically (issue #4)
-
-**Problem:** `checkAndBan` reads `isBanned`, and if false, fires `banUser()` and sends
-modmail. Two concurrent final strikes can both read `isBanned=false` before either writes
-`isBanned=true`, causing duplicate bans and duplicate modmail.
-
-**Fix:** Set `isBanned=true` inside the `updateStrikeRecord` callback (already atomic).
-Move the `banUser()` / modmail calls to after the record write, and use the return value
-of `updateStrikeRecord` to determine if this invocation was the one that flipped the flag.
-Only the invocation that actually wrote `isBanned=true` fires the side effects.
-
-Files: `src/core/strikes.ts` (`checkAndBan`, `addStrike`).
+Files: `src/routes/api.ts` (note/removal appends), `src/routes/forms.ts` (note/removal appends).
 
 ---
 
 ## P2 — UX Reliability (fix for production confidence)
-
-### 4. Auto-refresh user detail view (issue #14)
-
-**Problem:** The dashboard overview polls every 30s, but `useUser` only fetches on mount
-and after local actions. A mod parked on a user detail page during an active incident
-operates on indefinitely stale state.
-
-**Fix:** Add a polling interval (e.g. 30s) in `useUser` using the same seqRef pattern
-already in `useDashboard`. Or add a manual refresh button as a simpler alternative.
-
-Files: `src/client/hooks/useUser.ts`.
-
----
-
-### 5. Clarify stale dashboard detail on concurrent mod actions (issue #2)
-
-**Problem:** If two mods act on the same user simultaneously, the second mod's UI may show
-the pre-action state and display a confusing server error when they try to act.
-
-**Fix:** After a failed action (non-ok response), always reload user data before showing
-the error. This way the UI self-corrects rather than leaving the mod staring at wrong state.
-
-Files: `src/client/views/UserDetail.tsx` (error handling in `StrikePanel`, `ResetPanel`).
-
----
-
-### 6. Validate config values (issue #8)
-
-**Problem:** `maxStrikes=0` or negative makes every strike immediately ban-worthy.
-Negative `banDuration` is silently treated as permanent.
-
-**Fix:** Clamp `maxStrikes` to at least 1 in `strikes.ts`. Clamp `banDuration` to 0 or
-above. Optionally surface a warning toast on the settings page for out-of-range values.
-
-Files: `src/core/strikes.ts` (add guards at read time), `devvit.json` (add `min` if SDK supports it).
-
----
-
-### 7. Defensive fallback for empty rules (issue #9)
-
-**Problem:** If a mod sets subreddit rules to only blank lines, the rules list filters to
-empty and the strike/remove forms have no selectable rule, making them unusable.
-
-**Fix:** After filtering, if `ruleOptions` is empty, fall back to `DEFAULT_CONFIG.rules`.
-Add a visible warning in the form or settings so mods know their rules config is invalid.
-
-Files: `src/routes/menu.ts` (rules parsing), possibly a settings validation step.
-
----
 
 ### 8. Recover stale dashboard post reference (issue #10)
 
@@ -113,18 +100,6 @@ attempt to fetch the post via Reddit API to confirm it exists. If it does not, c
 stored ref and let the mod create a new dashboard post.
 
 Files: `src/routes/menu.ts` (`create-dashboard-post` handler).
-
----
-
-### 9. DM ordering — send after ban confirmation (issue #13)
-
-**Problem:** The warning DM is built and sent before `checkAndBan` is called. If the ban
-API fails, the user receives "you have been banned" but was not actually banned.
-
-**Fix:** Move DM send to after `checkAndBan` resolves. Pass the ban outcome into the DM
-template so the message accurately reflects what actually happened.
-
-Files: `src/routes/forms.ts` (reorder DM send relative to `checkAndBan` call).
 
 ---
 
@@ -163,12 +138,6 @@ Files: `src/core/redis.ts`, `src/routes/triggers.ts`.
 ---
 
 ## P4 — Polish / Nice-to-Have
-
-### 12. Wording: reset vs delete (issue #12)
-
-Reset keeps full history and only clears active strikes. Update UI labels and README
-to make this explicit: "Reset active strikes" not just "Reset Strikes". Add a tooltip
-or helper text in the reset form.
 
 ### 13. Manual ban/unban reconciliation (issue #11)
 
