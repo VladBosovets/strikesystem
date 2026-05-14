@@ -45,8 +45,8 @@ function UserSummary({ user, maxStrikes }: { user: DashboardUserDetail; maxStrik
 }
 
 function StrikePanel({
-  rules, userId, onSuccess, onCancel,
-}: { rules: string[]; userId: string; onSuccess: (msg: string) => void; onCancel: () => void }) {
+  rules, userId, onSuccess, onCancel, onReload,
+}: { rules: string[]; userId: string; onSuccess: (msg: string) => void; onCancel: () => void; onReload?: () => void }) {
   const [rule, setRule] = useState(rules[0] ?? '');
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
@@ -70,6 +70,7 @@ function StrikePanel({
       const dm = data.dmFailed ? ' (DM not delivered)' : '';
       onSuccess(`Strike ${data.newTotal}/${data.maxStrikes} issued${banned}${dm}`);
     } catch (err) {
+      onReload?.();
       setError(err instanceof Error ? err.message : 'Something went wrong.');
       setLoading(false);
     }
@@ -100,8 +101,8 @@ function StrikePanel({
 }
 
 function ResetPanel({
-  userId, isBanned, onSuccess, onCancel,
-}: { userId: string; isBanned: boolean; onSuccess: (msg: string) => void; onCancel: () => void }) {
+  userId, isBanned, onSuccess, onCancel, onReload,
+}: { userId: string; isBanned: boolean; onSuccess: (msg: string) => void; onCancel: () => void; onReload?: () => void }) {
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,6 +128,7 @@ function ResetPanel({
           : '';
       onSuccess(`${data.strikesCleared} strike(s) cleared.${unban}`);
     } catch (err) {
+      onReload?.();
       setError(err instanceof Error ? err.message : 'Something went wrong.');
       setLoading(false);
     }
@@ -134,7 +136,7 @@ function ResetPanel({
 
   return (
     <div className="ud-panel">
-      <span className="ud-panel__title">{isBanned ? 'Reset Strikes & Unban' : 'Reset Strikes'}</span>
+      <span className="ud-panel__title">{isBanned ? 'Reset Strikes & Unban' : 'Reset Active Strikes'}</span>
       <div>
         <label className="ud-panel__label">Reason for reset</label>
         <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Appeal approved, served time, etc." />
@@ -143,7 +145,7 @@ function ResetPanel({
       <div className="ud-panel__row">
         <button className="ud-panel__cancel" onClick={onCancel}>Cancel</button>
         <button className="ud-panel__submit" onClick={submit} disabled={loading || !reason.trim()}>
-          {loading ? 'Resetting…' : isBanned ? 'Reset & Unban' : 'Reset Strikes'}
+          {loading ? 'Resetting…' : isBanned ? 'Reset & Unban' : 'Reset Active Strikes'}
         </button>
       </div>
     </div>
@@ -240,7 +242,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             className={`ud-action-btn ud-action-btn--danger${activePanel === 'reset' ? ' ud-action-btn--active' : ''}`}
             onClick={() => setActivePanel(activePanel === 'reset' ? null : 'reset')}
           >
-            {user.isBanned ? 'Reset & Unban' : 'Reset Strikes'}
+            {user.isBanned ? 'Reset & Unban' : 'Reset Active Strikes'}
           </button>
         )}
         <button
@@ -263,6 +265,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           userId={userId}
           onSuccess={handleActionSuccess}
           onCancel={() => setActivePanel(null)}
+          onReload={reload}
         />
       )}
       {activePanel === 'reset' && (
@@ -271,6 +274,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           isBanned={user.isBanned}
           onSuccess={handleActionSuccess}
           onCancel={() => setActivePanel(null)}
+          onReload={reload}
         />
       )}
       {activePanel === 'note' && (

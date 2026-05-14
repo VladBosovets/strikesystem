@@ -60,7 +60,8 @@ menu.post('/warn-user', async (c) => {
 
     const rulesRaw =
       (await settings.get<string>('rules')) ?? DEFAULT_CONFIG.rules.join('\n');
-    const rules = rulesRaw.split('\n').filter(Boolean);
+    const parsedRules = rulesRaw.split('\n').filter(Boolean);
+    const rules = parsedRules.length > 0 ? parsedRules : DEFAULT_CONFIG.rules;
     const ruleOptions = rules.map((r) => ({ label: r, value: r }));
 
     let historyText =
@@ -494,7 +495,8 @@ menu.post('/remove-and-log', async (c) => {
     });
 
     const rulesRaw = (await settings.get<string>('rules')) ?? DEFAULT_CONFIG.rules.join('\n');
-    const rules = rulesRaw.split('\n').filter(Boolean);
+    const parsedRules = rulesRaw.split('\n').filter(Boolean);
+    const rules = parsedRules.length > 0 ? parsedRules : DEFAULT_CONFIG.rules;
     const ruleOptions = rules.map((r) => ({ label: r, value: r }));
 
     const fields: FormField[] = [

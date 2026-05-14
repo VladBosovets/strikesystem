@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+
+const REFRESH_INTERVAL_MS = 30_000;
 import type { DashboardUserDetailResponse } from '../types/api';
 
 type State =
@@ -9,14 +11,15 @@ type State =
 export function useUser(userId: string) {
   const [state, setState] = useState<State>({ status: 'loading' });
   const [reloadKey, setReloadKey] = useState(0);
+  const seqRef = useRef(0);
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
-    let cancelled = false;
+    const seq = ++seqRef.current;
 
     async function load() {
-      setState({ status: 'loading' });
+      setState((s) => s.status === 'success' ? s : { status: 'loading' });
       try {
         const res = await fetch(`/api/dashboard/user/${encodeURIComponent(userId)}`);
         if (!res.ok) {
@@ -24,14 +27,18 @@ export function useUser(userId: string) {
           throw new Error(msg);
         }
         const data = (await res.json()) as DashboardUserDetailResponse;
-        if (!cancelled) setState({ status: 'success', data });
+        if (seq === seqRef.current) setState({ status: 'success', data });
       } catch (err) {
-        if (!cancelled) setState({ status: 'error', message: err instanceof Error ? err.message : 'Unknown error' });
+        if (seq === seqRef.current) setState({ status: 'error', message: err instanceof Error ? err.message : 'Unknown error' });
       }
     }
 
     void load();
-    return () => { cancelled = true; };
+    const id = setInterval(() => { void load(); }, REFRESH_INTERVAL_MS);
+    return () => {
+      clearInterval(id);
+      seqRef.current++;
+    };
   }, [userId, reloadKey]);
 
   return {

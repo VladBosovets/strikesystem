@@ -31,8 +31,8 @@ async function loadConfig(): Promise<Config> {
   const notifyModmailOnBan = (await settings.get<boolean>('notifyModmail')) ?? DEFAULT_CONFIG.notifyModmailOnBan;
 
   return {
-    maxStrikesBeforeBan: maxStrikes,
-    banDuration,
+    maxStrikesBeforeBan: Math.max(1, Math.floor(maxStrikes)),
+    banDuration: Math.max(0, Math.floor(banDuration)),
     rules: rules.length > 0 ? rules : DEFAULT_CONFIG.rules,
     warningMessageTemplate,
     notifyModmailOnBan,

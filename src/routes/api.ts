@@ -24,7 +24,8 @@ async function isMod(): Promise<boolean> {
 
 async function loadRules(): Promise<string[]> {
   const raw = (await settings.get<string>('rules')) ?? DEFAULT_CONFIG.rules.join('\n');
-  return raw.split('\n').filter(Boolean);
+  const rules = raw.split('\n').filter(Boolean);
+  return rules.length > 0 ? rules : DEFAULT_CONFIG.rules;
 }
 
 api.get('/dashboard/config', async (c) => {
