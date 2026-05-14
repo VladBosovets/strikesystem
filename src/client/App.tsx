@@ -18,7 +18,7 @@ declare global {
 
 export function App() {
   const [view, setView] = useState<View>({ name: 'overview' });
-  const { loading, error, data, reload } = useDashboard();
+  const { loading, error, forbidden, data, reload } = useDashboard();
 
   useEffect(() => {
     const sub = window.devvit?.context?.subredditName;
@@ -27,6 +27,14 @@ export function App() {
 
   function handleSelectUser(user: DashboardUser) {
     setView({ name: 'user-detail', userId: user.userId, username: user.username });
+  }
+
+  if (forbidden) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <p>This dashboard is for moderators only.</p>
+      </div>
+    );
   }
 
   if (view.name === 'overview') {
