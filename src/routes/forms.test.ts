@@ -47,21 +47,22 @@ const SUB = 't5_sub123';
 const MOD = 't2_mod123';
 const TARGET_ID = 't2_target';
 const TARGET_USER = 'targetuser';
+const TEST_NONCE = 'testnonce';
 
-async function post(path: string, body: unknown): Promise<{ showToast?: string }> {
+async function post(path: string, body: Record<string, unknown>): Promise<{ showToast?: string }> {
   const res = await forms.request(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ token: TEST_NONCE, ...body }),
   });
   return res.json();
 }
 
 const keys = {
-  pendingWarn:    () => `warn-pending:${SUB}:${MOD}`,
-  pendingReset:   () => `reset-pending:${SUB}:${MOD}`,
-  pendingModNote: () => `modnote-pending:${SUB}:${MOD}`,
-  pendingRemoval: () => `removal-pending:${SUB}:${MOD}`,
+  pendingWarn:    () => `warn-pending:${SUB}:${MOD}:${TEST_NONCE}`,
+  pendingReset:   () => `reset-pending:${SUB}:${MOD}:${TEST_NONCE}`,
+  pendingModNote: () => `modnote-pending:${SUB}:${MOD}:${TEST_NONCE}`,
+  pendingRemoval: () => `removal-pending:${SUB}:${MOD}:${TEST_NONCE}`,
   strike:         (uid = TARGET_ID) => `strikes:${SUB}:${uid}`,
   modNotes:       (uid = TARGET_ID) => `mod-notes:${SUB}:${uid}`,
 };

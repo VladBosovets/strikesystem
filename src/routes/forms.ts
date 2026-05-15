@@ -9,6 +9,7 @@ type WarnUserFormValues = {
   history?: string;
   rule?: string | string[];
   note?: string;
+  token?: string;
 };
 
 export const forms = new Hono();
@@ -21,7 +22,8 @@ forms.post('/warn-user-submit', async (c) => {
     if (!modUserId) {
       return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
     }
-    const pending = await popPendingWarn(context.subredditId, modUserId);
+    const nonce = values.token?.trim() ?? '';
+    const pending = await popPendingWarn(context.subredditId, modUserId, nonce);
     if (!pending) {
       return c.json<UiResponse>({ showToast: 'Session expired. Please try again.' }, 200);
     }
@@ -99,14 +101,15 @@ forms.post('/view-strikes-close', async (c) => {
 
 forms.post('/reset-strikes-submit', async (c) => {
   try {
-    const values = await c.req.json<{ reason?: string }>();
+    const values = await c.req.json<{ reason?: string; token?: string }>();
 
     const modUserId = context.userId;
     if (!modUserId) {
       return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
     }
 
-    const pending = await popPendingReset(context.subredditId, modUserId);
+    const nonce = values.token?.trim() ?? '';
+    const pending = await popPendingReset(context.subredditId, modUserId, nonce);
     if (!pending) {
       return c.json<UiResponse>({ showToast: 'Session expired. Please try again.' }, 200);
     }
@@ -178,14 +181,15 @@ forms.post('/reset-strikes-submit', async (c) => {
 
 forms.post('/add-mod-note-submit', async (c) => {
   try {
-    const values = await c.req.json<{ note?: string }>();
+    const values = await c.req.json<{ note?: string; token?: string }>();
 
     const modUserId = context.userId;
     if (!modUserId) {
       return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
     }
 
-    const pending = await popPendingModNote(context.subredditId, modUserId);
+    const nonce = values.token?.trim() ?? '';
+    const pending = await popPendingModNote(context.subredditId, modUserId, nonce);
     if (!pending) {
       return c.json<UiResponse>({ showToast: 'Session expired. Please try again.' }, 200);
     }
@@ -216,14 +220,15 @@ forms.post('/add-mod-note-submit', async (c) => {
 
 forms.post('/remove-and-log-submit', async (c) => {
   try {
-    const values = await c.req.json<{ rule?: string | string[]; note?: string }>();
+    const values = await c.req.json<{ rule?: string | string[]; note?: string; token?: string }>();
 
     const modUserId = context.userId;
     if (!modUserId) {
       return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
     }
 
-    const pending = await popPendingRemoval(context.subredditId, modUserId);
+    const nonce = values.token?.trim() ?? '';
+    const pending = await popPendingRemoval(context.subredditId, modUserId, nonce);
     if (!pending) {
       return c.json<UiResponse>({ showToast: 'Session expired. Please try again.' }, 200);
     }

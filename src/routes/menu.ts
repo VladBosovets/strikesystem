@@ -89,7 +89,8 @@ menu.post('/warn-user', async (c) => {
       return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
     }
 
-    await savePendingWarn(context.subredditId, modUserId, {
+    const nonce = Math.random().toString(36).slice(2, 10);
+    await savePendingWarn(context.subredditId, modUserId, nonce, {
       userId: targetUser.id,
       username: targetUser.username,
       postUrl,
@@ -127,6 +128,12 @@ menu.post('/warn-user', async (c) => {
         type: 'paragraph',
         required: false,
         defaultValue: '',
+      },
+      {
+        name: 'token',
+        label: 'Session',
+        type: 'string',
+        defaultValue: nonce,
       },
     ];
 
@@ -316,7 +323,8 @@ menu.post('/reset-strikes', async (c) => {
       return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
     }
 
-    await savePendingReset(context.subredditId, modUserId, {
+    const nonce = Math.random().toString(36).slice(2, 10);
+    await savePendingReset(context.subredditId, modUserId, nonce, {
       userId: targetUser.id,
       username: targetUser.username,
     });
@@ -336,6 +344,12 @@ menu.post('/reset-strikes', async (c) => {
         type: 'paragraph',
         required: true,
         defaultValue: '',
+      },
+      {
+        name: 'token',
+        label: 'Session',
+        type: 'string',
+        defaultValue: nonce,
       },
     ];
 
@@ -402,7 +416,8 @@ menu.post('/add-mod-note', async (c) => {
       return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
     }
 
-    await savePendingModNote(context.subredditId, modUserId, {
+    const nonce = Math.random().toString(36).slice(2, 10);
+    await savePendingModNote(context.subredditId, modUserId, nonce, {
       userId: targetUser.id,
       username: targetUser.username,
     });
@@ -414,6 +429,12 @@ menu.post('/add-mod-note', async (c) => {
         type: 'paragraph',
         required: true,
         defaultValue: '',
+      },
+      {
+        name: 'token',
+        label: 'Session',
+        type: 'string',
+        defaultValue: nonce,
       },
     ];
 
@@ -486,7 +507,8 @@ menu.post('/remove-and-log', async (c) => {
       return c.json<UiResponse>({ showToast: 'Could not identify your account.' }, 200);
     }
 
-    await savePendingRemoval(context.subredditId, modUserId, {
+    const nonce = Math.random().toString(36).slice(2, 10);
+    await savePendingRemoval(context.subredditId, modUserId, nonce, {
       userId: targetUser.id,
       username: targetUser.username,
       contentId: targetId,
@@ -513,6 +535,12 @@ menu.post('/remove-and-log', async (c) => {
         type: 'paragraph',
         required: false,
         defaultValue: '',
+      },
+      {
+        name: 'token',
+        label: 'Session',
+        type: 'string',
+        defaultValue: nonce,
       },
     ];
 

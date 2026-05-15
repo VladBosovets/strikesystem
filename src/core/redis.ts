@@ -94,17 +94,17 @@ const warnedIndexKey = (subredditId: string) =>
 
 const configKey = (subredditId: string) => `config:${subredditId}`;
 
-const pendingWarnKey = (subredditId: string, modUserId: string) =>
-  `warn-pending:${subredditId}:${modUserId}`;
+const pendingWarnKey = (subredditId: string, modUserId: string, nonce: string) =>
+  `warn-pending:${subredditId}:${modUserId}:${nonce}`;
 
-const pendingResetKey = (subredditId: string, modUserId: string) =>
-  `reset-pending:${subredditId}:${modUserId}`;
+const pendingResetKey = (subredditId: string, modUserId: string, nonce: string) =>
+  `reset-pending:${subredditId}:${modUserId}:${nonce}`;
 
-const pendingModNoteKey = (subredditId: string, modUserId: string) =>
-  `modnote-pending:${subredditId}:${modUserId}`;
+const pendingModNoteKey = (subredditId: string, modUserId: string, nonce: string) =>
+  `modnote-pending:${subredditId}:${modUserId}:${nonce}`;
 
-const pendingRemovalKey = (subredditId: string, modUserId: string) =>
-  `removal-pending:${subredditId}:${modUserId}`;
+const pendingRemovalKey = (subredditId: string, modUserId: string, nonce: string) =>
+  `removal-pending:${subredditId}:${modUserId}:${nonce}`;
 
 const modNotesKey = (subredditId: string, userId: string) =>
   `mod-notes:${subredditId}:${userId}`;
@@ -288,18 +288,20 @@ export async function clearDeletedCommentFromRecords(
 export async function savePendingWarn(
   subredditId: string,
   modUserId: string,
+  nonce: string,
   data: PendingWarn
 ): Promise<void> {
-  const key = pendingWarnKey(subredditId, modUserId);
+  const key = pendingWarnKey(subredditId, modUserId, nonce);
   await redis.set(key, JSON.stringify(data));
   await redis.expire(key, PENDING_WARN_TTL_SECONDS);
 }
 
 export async function popPendingWarn(
   subredditId: string,
-  modUserId: string
+  modUserId: string,
+  nonce: string
 ): Promise<PendingWarn | null> {
-  const key = pendingWarnKey(subredditId, modUserId);
+  const key = pendingWarnKey(subredditId, modUserId, nonce);
   const raw = await redis.get(key);
   if (!raw) return null;
   await redis.del(key);
@@ -309,18 +311,20 @@ export async function popPendingWarn(
 export async function savePendingReset(
   subredditId: string,
   modUserId: string,
+  nonce: string,
   data: PendingReset
 ): Promise<void> {
-  const key = pendingResetKey(subredditId, modUserId);
+  const key = pendingResetKey(subredditId, modUserId, nonce);
   await redis.set(key, JSON.stringify(data));
   await redis.expire(key, PENDING_WARN_TTL_SECONDS);
 }
 
 export async function popPendingReset(
   subredditId: string,
-  modUserId: string
+  modUserId: string,
+  nonce: string
 ): Promise<PendingReset | null> {
-  const key = pendingResetKey(subredditId, modUserId);
+  const key = pendingResetKey(subredditId, modUserId, nonce);
   const raw = await redis.get(key);
   if (!raw) return null;
   await redis.del(key);
@@ -335,18 +339,20 @@ export async function getWarnedUserIds(subredditId: string): Promise<string[]> {
 export async function savePendingRemoval(
   subredditId: string,
   modUserId: string,
+  nonce: string,
   data: PendingRemoval
 ): Promise<void> {
-  const key = pendingRemovalKey(subredditId, modUserId);
+  const key = pendingRemovalKey(subredditId, modUserId, nonce);
   await redis.set(key, JSON.stringify(data));
   await redis.expire(key, PENDING_WARN_TTL_SECONDS);
 }
 
 export async function popPendingRemoval(
   subredditId: string,
-  modUserId: string
+  modUserId: string,
+  nonce: string
 ): Promise<PendingRemoval | null> {
-  const key = pendingRemovalKey(subredditId, modUserId);
+  const key = pendingRemovalKey(subredditId, modUserId, nonce);
   const raw = await redis.get(key);
   if (!raw) return null;
   await redis.del(key);
@@ -356,18 +362,20 @@ export async function popPendingRemoval(
 export async function savePendingModNote(
   subredditId: string,
   modUserId: string,
+  nonce: string,
   data: PendingModNote
 ): Promise<void> {
-  const key = pendingModNoteKey(subredditId, modUserId);
+  const key = pendingModNoteKey(subredditId, modUserId, nonce);
   await redis.set(key, JSON.stringify(data));
   await redis.expire(key, PENDING_WARN_TTL_SECONDS);
 }
 
 export async function popPendingModNote(
   subredditId: string,
-  modUserId: string
+  modUserId: string,
+  nonce: string
 ): Promise<PendingModNote | null> {
-  const key = pendingModNoteKey(subredditId, modUserId);
+  const key = pendingModNoteKey(subredditId, modUserId, nonce);
   const raw = await redis.get(key);
   if (!raw) return null;
   await redis.del(key);

@@ -59,22 +59,16 @@ Button label and panel title updated to "Reset Active Strikes" throughout `UserD
 
 ---
 
-## P1 — Data Integrity (fix before any broad install)
-
-### 1. Per-form pending tokens (issue #1)
-
-**Problem:** Pending state is keyed by `subredditId + modUserId`. If a mod opens a strike
-form for User A, then opens one for User B before submitting, submitting A's form will
-strike User B. Same risk for reset, mod note, and remove & log.
-
-**Fix:** Include a random nonce/token in the form payload when the menu item fires.
-Echo it back on submit. The handler validates the token matches before acting.
-This makes each form instance unique regardless of how many a mod has open.
-
-Files: `src/core/redis.ts` (pending key shape), `src/routes/menu.ts` (add nonce to form),
-`src/routes/forms.ts` (validate nonce on submit).
+### P1 #1 — Per-form pending tokens ✅
+Each menu handler now generates a random nonce and stores pending data under
+`{type}-pending:{subredditId}:{modUserId}:{nonce}`. The nonce is passed to the form as a
+`Session` field and echoed back on submit. The submit handler looks up the pending record
+by the exact nonce, so two open forms for different users can never collide.
+Covers: warn, reset, mod note, and remove & log. Tests updated to use `TEST_NONCE`.
 
 ---
+
+## P1 — Data Integrity (remaining)
 
 ### 2. Wrap mod notes and removal appends in updateStrikeRecord (issues #3, #7)
 
